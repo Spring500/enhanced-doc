@@ -248,20 +248,20 @@ function postProcess() {
         }
         // 去掉 SVG 自带的 overflow:hidden（Mermaid 用它裁切内容）
         svg.style.overflow = 'visible';
-        // 确保 SVG 宽度填满容器
+        // 宽度填满容器但不溢出
         svg.style.width = '100%';
-        svg.style.maxWidth = 'none';
+        svg.style.maxWidth = '100%';
 
         if (w && h && w > 0 && h > 0) {
           var ratio = w / h;
           var container = svg.closest('.mermaid');
           if (container) {
             var cw = container.clientWidth || 700;
+            // 按图比例算高度，clamp 在容器宽的 0.5x ~ 2x 之间
             var idealH = cw / ratio;
-            var vhLimit = window.innerHeight * 0.75;
-            idealH = Math.max(cw * 0.5, Math.min(idealH, cw * 2, vhLimit));
+            idealH = Math.max(cw * 0.5, Math.min(idealH, cw * 2));
             container.style.minHeight = idealH + 'px';
-            container.style.maxHeight = Math.min(cw * 2, vhLimit) + 'px';
+            container.style.maxHeight = (cw * 2) + 'px';
           }
         }
         // 对无明确高度的 SVG（如 stateDiagram），用内容实际高度回退
