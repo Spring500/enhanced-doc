@@ -234,19 +234,26 @@ function postProcess() {
   if (document.querySelector('.mermaid')) {
     mermaid.run({ querySelector: '.mermaid' }).then(function() {
       document.querySelectorAll('.mermaid svg').forEach(function(svg) {
-        // 根据 viewBox 宽高比动态设定容器高度（限制在 0.5x ~ 2x 容器宽之间）
+        // 根据 SVG 尺寸动态设定容器高度（限制在 0.5x ~ 2x 容器宽之间）
+        var w, h;
         var vb = svg.getAttribute('viewBox');
+        var sw = svg.getAttribute('width');
+        var sh = svg.getAttribute('height');
         if (vb) {
-          var parts = vb.split(/\s+/);
-          var vbW = parseFloat(parts[2]) || 1;
-          var vbH = parseFloat(parts[3]) || 1;
-          var ratio = vbW / vbH;
+          var vbParts = vb.split(/\s+/); w = parseFloat(vbParts[2]); h = parseFloat(vbParts[3]);
+        } else if (sw && sw !== '100%' && sh) {
+          w = parseFloat(sw); h = parseFloat(sh);
+        } else {
+          try { var bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
+        }
+        if (w && h && w > 0 && h > 0) {
+          var ratio = w / h;
           var container = svg.closest('.mermaid');
           if (container) {
             var cw = container.clientWidth || 700;
-            var h = cw / ratio;
-            h = Math.max(cw * 0.5, Math.min(h, cw * 2));
-            container.style.minHeight = h + 'px';
+            var idealH = cw / ratio;
+            idealH = Math.max(cw * 0.5, Math.min(idealH, cw * 2));
+            container.style.minHeight = idealH + 'px';
             container.style.maxHeight = (cw * 2) + 'px';
           }
         }
