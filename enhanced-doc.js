@@ -192,7 +192,8 @@ function styles() {
     '.admonition-title{font-weight:bold;margin-bottom:4px}',
     '.admonition-body>:last-child{margin-bottom:0}',
     '.ed-mermaid,.ed-chart{background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}',
-    '.mermaid svg{cursor:grab}',
+    '.mermaid{width:100%;overflow:auto}',
+    '.mermaid svg{cursor:grab;display:block}',
     'h2.ed-collapsible,h3.ed-collapsible,h4.ed-collapsible,h5.ed-collapsible,h6.ed-collapsible{cursor:pointer;user-select:none}',
     'h2.ed-collapsible::before,h3.ed-collapsible::before,h4.ed-collapsible::before,h5.ed-collapsible::before,h6.ed-collapsible::before{content:"▾ ";font-size:.75em}',
     'h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-collapsed::before,h6.ed-collapsed::before{content:"▸ "}',
@@ -233,6 +234,22 @@ function postProcess() {
   if (document.querySelector('.mermaid')) {
     mermaid.run({ querySelector: '.mermaid' }).then(function() {
       document.querySelectorAll('.mermaid svg').forEach(function(svg) {
+        // 根据 viewBox 宽高比动态设定容器高度（限制在 0.5x ~ 2x 容器宽之间）
+        var vb = svg.getAttribute('viewBox');
+        if (vb) {
+          var parts = vb.split(/\s+/);
+          var vbW = parseFloat(parts[2]) || 1;
+          var vbH = parseFloat(parts[3]) || 1;
+          var ratio = vbW / vbH;
+          var container = svg.closest('.mermaid');
+          if (container) {
+            var cw = container.clientWidth || 700;
+            var h = cw / ratio;
+            h = Math.max(cw * 0.5, Math.min(h, cw * 2));
+            container.style.minHeight = h + 'px';
+            container.style.maxHeight = (cw * 2) + 'px';
+          }
+        }
         try { svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
           fit: true, center: true, minZoom: 0.25, maxZoom: 5 }); } catch(e) {}
       });
