@@ -3,7 +3,7 @@
 > 一行 JS 把 Markdown 变成带图、表、数学公式、导航的富文档。为 AI Agent 设计，对人类可读。
 
 ```html
-<script src="https://cdn.jsdelivr.net/gh/Spring500/enhanced-doc@master/enhanced-doc.js"></script>
+<script src="https://spring500.github.io/enhanced-doc/enhanced-doc.js"></script>
 ```
 
 ## 功能
@@ -43,7 +43,7 @@
 正文内容……
 
 </script>
-<script src="https://cdn.jsdelivr.net/gh/Spring500/enhanced-doc@master/enhanced-doc.js"></script>
+<script src="https://spring500.github.io/enhanced-doc/enhanced-doc.js"></script>
 </body>
 </html>
 ```
