@@ -2,7 +2,6 @@
 
 (function() {
 'use strict';
-console.log('ENHANCED-DOC: running, marked=' + typeof marked);
 
 if (typeof marked === 'undefined') {
   console.error('enhanced-doc: marked.js 未加载，请检查 CDN 引用');
