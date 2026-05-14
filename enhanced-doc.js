@@ -246,6 +246,12 @@ function postProcess() {
         } else {
           try { var bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
         }
+        // 去掉 SVG 自带的 overflow:hidden（Mermaid 用它裁切内容）
+        svg.style.overflow = 'visible';
+        // 确保 SVG 宽度填满容器
+        svg.style.width = '100%';
+        svg.style.maxWidth = 'none';
+
         if (w && h && w > 0 && h > 0) {
           var ratio = w / h;
           var container = svg.closest('.mermaid');
@@ -257,6 +263,18 @@ function postProcess() {
             container.style.minHeight = idealH + 'px';
             container.style.maxHeight = Math.min(cw * 2, vhLimit) + 'px';
           }
+        }
+        // 对无明确高度的 SVG（如 stateDiagram），用内容实际高度回退
+        if (!svg.getAttribute('height')) {
+          try {
+            var g = svg.querySelector('g');
+            if (g) {
+              var bb = g.getBBox();
+              if (bb && bb.height > 0) {
+                svg.setAttribute('height', Math.ceil(bb.height + bb.y + 10));
+              }
+            }
+          } catch(e) {}
         }
         try { svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
           fit: true, center: true, minZoom: 0.25, maxZoom: 5 }); } catch(e) {}
