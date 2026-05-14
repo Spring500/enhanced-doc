@@ -252,9 +252,10 @@ function postProcess() {
           if (container) {
             var cw = container.clientWidth || 700;
             var idealH = cw / ratio;
-            idealH = Math.max(cw * 0.5, Math.min(idealH, cw * 2));
+            var vhLimit = window.innerHeight * 0.75;
+            idealH = Math.max(cw * 0.5, Math.min(idealH, cw * 2, vhLimit));
             container.style.minHeight = idealH + 'px';
-            container.style.maxHeight = (cw * 2) + 'px';
+            container.style.maxHeight = Math.min(cw * 2, vhLimit) + 'px';
           }
         }
         try { svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
