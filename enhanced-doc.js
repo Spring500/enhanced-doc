@@ -96,18 +96,14 @@ function escapeText(str) {
 }
 
 // ================================================================
-// 4. 提取 Markdown 正文（enhanced-doc.js <script> 之前的 body 内容）
+// 4. 提取 Markdown 正文（从 <script type="text/x-markdown"> 读取）
 // ================================================================
+// 正文包裹在 <script type="text/x-markdown"> 中，浏览器不解析其中的 <>，
+// 避免 <details>、Mermaid -->、内嵌 HTML 等被浏览器提前处理。
 
 function extractMarkdown() {
-  var body = document.body, parts = [];
-  for (var i = 0; i < body.childNodes.length; i++) {
-    var node = body.childNodes[i];
-    if (node.tagName === 'SCRIPT' && node.src && node.src.indexOf('enhanced-doc.js') !== -1) break;
-    if (node.nodeType === 3) { parts.push(node.textContent); }
-    else if (node.nodeType === 1 && node.tagName !== 'SCRIPT') { parts.push(node.outerHTML); }
-  }
-  return parts.join('');
+  var el = document.querySelector('script[type="text/x-markdown"]');
+  return el ? el.textContent : '';
 }
 
 // ================================================================
