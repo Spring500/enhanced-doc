@@ -110,14 +110,26 @@ function extractMarkdown() {
   return el ? el.textContent : '';
 }
 
+// :::mermaid 标记正则
+const MERMAID_START_RE = /^:::\s*mermaid\s*\n/;
+const MERMAID_RE = /^:::\s*mermaid\s*\n([\s\S]*?)\n:::/;
+
+// :::chart 标记正则
+const CHART_START_RE = /^:::\s*chart\s*\n/;
+const CHART_RE = /^:::\s*chart\s*\n([\s\S]*?)\n:::/;
+
+// !!! 提示框正则
+const ADMONITION_START_RE = /^!!!\s+(\w+)\s+/;
+const ADMONITION_RE = /^!!!\s+(Tip|Warning|Note|Error)\s*(.*?)\n((?:[ \t]{4,}.*\n?)*)/;
+
 // ── 注册 marked 扩展 ──
 function registerMarkedExtensions() {
   // :::mermaid
   marked.use({ extensions: [{
     name: 'edMermaid', level: 'block',
-    start: function(src) { return src.match(/^:::\s*mermaid\s*\n/)?.index; },
+    start: function(src) { return src.match(MERMAID_START_RE)?.index; },
     tokenizer: function(src) {
-      const m = src.match(/^:::\s*mermaid\s*\n([\s\S]*?)\n:::/);
+      const m = src.match(MERMAID_RE);
       if (!m) return;
       return { type: 'edMermaid', raw: m[0], text: m[1] };
     },
@@ -130,9 +142,9 @@ function registerMarkedExtensions() {
   // :::chart
   marked.use({ extensions: [{
     name: 'edChart', level: 'block',
-    start: function(src) { return src.match(/^:::\s*chart\s*\n/)?.index; },
+    start: function(src) { return src.match(CHART_START_RE)?.index; },
     tokenizer: function(src) {
-      const m = src.match(/^:::\s*chart\s*\n([\s\S]*?)\n:::/);
+      const m = src.match(CHART_RE);
       if (!m) return;
       return { type: 'edChart', raw: m[0], text: m[1] };
     },
@@ -145,9 +157,9 @@ function registerMarkedExtensions() {
   // !!! 提示框
   marked.use({ extensions: [{
     name: 'edAdmonition', level: 'block',
-    start: function(src) { return src.match(/^!!!\s+(\w+)\s+/)?.index; },
+    start: function(src) { return src.match(ADMONITION_START_RE)?.index; },
     tokenizer: function(src) {
-      const m = src.match(/^!!!\s+(Tip|Warning|Note|Error)\s*(.*?)\n((?:[ \t]{4,}.*\n?)*)/);
+      const m = src.match(ADMONITION_RE);
       if (!m) return;
       return {
         type: 'edAdmonition', raw: m[0],
@@ -430,5 +442,14 @@ function initControls() {
     resizeAllCharts();
   });
 }
+
+// 导出可测接口（仅开发/测试使用）
+window.__enhancedDoc = {
+  escapeText, buildLayout, styles,
+  MERMAID_START_RE, MERMAID_RE,
+  CHART_START_RE, CHART_RE,
+  ADMONITION_START_RE, ADMONITION_RE,
+  resizeAllCharts,
+};
 
 })();
