@@ -20,11 +20,12 @@ function loadJS(src) {
 }
 
 function loadCSS(href) {
-  return new Promise(function(resolve) {
+  return new Promise(function(resolve, reject) {
     var l = document.createElement('link');
     l.rel = 'stylesheet';
     l.href = href;
     l.onload = resolve;
+    l.onerror = function() { reject(new Error('CSS 加载失败: ' + href)); };
     document.head.appendChild(l);
   });
 }
