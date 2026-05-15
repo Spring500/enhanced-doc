@@ -8,6 +8,18 @@ enhanced-doc 是一个单文件的 JavaScript 渲染引擎，将 Markdown 转换
 - 目标：现代浏览器（ES2020+）
 - 无 package.json，无打包器，无测试框架
 
+## 目录结构
+
+```
+enhanced-doc/
+  enhanced-doc.js    # 渲染引擎（必须位于根目录，供 <script> 引用）
+  AGENTS.md          # 项目指南（本文件）
+  README.md
+  LICENSE
+  test/              # 开发测试/验收页面
+    index.html       # 全功能测试（相对引用 ../enhanced-doc.js）
+```
+
 ## 提交规范
 
 格式：
