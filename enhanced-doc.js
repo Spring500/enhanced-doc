@@ -8,6 +8,14 @@
 
 const CDN = 'https://cdn.jsdelivr.net/npm';
 
+// Mermaid 容器高度约束
+const MERMAID_FALLBACK_WIDTH = 700;
+const MERMAID_MIN_HEIGHT_RATIO = 0.5;
+const MERMAID_MAX_HEIGHT_RATIO = 2;
+
+// ECharts 默认 grid 边距
+const CHART_GRID = { top: 70, bottom: 40, left: 50, right: 20 };
+
 // ═══ 工具：动态加载 JS / CSS ═══
 function loadJS(src) {
   return new Promise((resolve, reject) => {
@@ -252,11 +260,11 @@ function renderMermaids() {
           const ratio = w / h;
           const container = svg.closest('.mermaid');
           if (container) {
-            const cw = container.clientWidth || 700;
+            const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
             let idealH = cw / ratio;
-            idealH = Math.max(cw * 0.5, Math.min(idealH, cw * 2));
+            idealH = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, Math.min(idealH, cw * MERMAID_MAX_HEIGHT_RATIO));
             container.style.minHeight = idealH + 'px';
-            container.style.maxHeight = (cw * 2) + 'px';
+            container.style.maxHeight = (cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
           }
         }
         if (!svg.getAttribute('height')) {
@@ -283,10 +291,10 @@ function renderCharts() {
     try {
       const opt = JSON.parse(el.textContent.trim());
       if (!opt.grid) { opt.grid = {}; }
-      if (opt.grid.top === undefined)    { opt.grid.top = 70; }
-      if (opt.grid.bottom === undefined) { opt.grid.bottom = 40; }
-      if (opt.grid.left === undefined)   { opt.grid.left = 50; }
-      if (opt.grid.right === undefined)  { opt.grid.right = 20; }
+      if (opt.grid.top === undefined)    { opt.grid.top = CHART_GRID.top; }
+      if (opt.grid.bottom === undefined) { opt.grid.bottom = CHART_GRID.bottom; }
+      if (opt.grid.left === undefined)   { opt.grid.left = CHART_GRID.left; }
+      if (opt.grid.right === undefined)  { opt.grid.right = CHART_GRID.right; }
       if (opt.backgroundColor === undefined) { opt.backgroundColor = 'transparent'; }
       const chart = echarts.init(el);
       chart.setOption(opt);
