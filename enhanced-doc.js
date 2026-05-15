@@ -252,7 +252,9 @@ function renderMermaids() {
         } else {
           try { const bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
         }
+        // 去掉 SVG 自带的 overflow:hidden（Mermaid 用它裁切内容）
         svg.style.overflow = 'visible';
+        // 宽度填满容器但不溢出
         svg.style.width = '100%';
         svg.style.maxWidth = '100%';
 
@@ -267,6 +269,7 @@ function renderMermaids() {
             container.style.maxHeight = (cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
           }
         }
+        // 对无明确高度的 SVG（如 stateDiagram），用内容实际高度回退
         if (!svg.getAttribute('height')) {
           try {
             const g = svg.querySelector('g');
