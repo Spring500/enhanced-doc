@@ -3,8 +3,10 @@
 > 一行 JS 把 Markdown 变成带图、表、数学公式、导航的富文档。为 AI Agent 设计，对人类可读。
 
 ```html
-<script src="https://spring500.github.io/enhanced-doc/enhanced-doc.js"></script>
+<script src="<your-host>/enhanced-doc.js"></script>
 ```
+
+将 `<your-host>` 替换为你实际部署 `enhanced-doc.js` 的地址。
 
 ## 功能
 
@@ -43,12 +45,12 @@
 正文内容……
 
 </script>
-<script src="https://spring500.github.io/enhanced-doc/enhanced-doc.js"></script>
+<script src="<your-host>/enhanced-doc.js"></script>
 </body>
 </html>
 ```
 
-所有依赖（Pico CSS、marked、Mermaid、ECharts、tocbot、MathJax 等）由 enhanced-doc.js 自动从 CDN 注入，无需手动引用。标题自动从 `# 标题` 提取。
+将 `<your-host>` 替换为你实际部署的地址。所有依赖（Pico CSS、marked、Mermaid、ECharts、tocbot、MathJax 等）由 enhanced-doc.js 自动从 CDN 注入，无需手动引用。标题自动从 `# 标题` 提取。
 
 ## 依赖
 
