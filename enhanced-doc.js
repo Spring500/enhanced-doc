@@ -84,7 +84,7 @@ loadJS(CDN + '/marked/marked.min.js').then(function() {
 
   // 字号/主题控件 + 后处理
   initControls();
-  setTimeout(postProcess, 600);
+  requestAnimationFrame(postProcess);
 }).catch(function(e) {
   document.body.innerHTML = '<pre style="color:red;padding:2rem;white-space:pre-wrap">enhanced-doc 加载失败:\n' + e.message + '</pre>';
 });
