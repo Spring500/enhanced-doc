@@ -222,9 +222,8 @@ function buildLayout(contentHTML) {
     + '</div>';
 }
 
-// ── 后处理器 ──
-function postProcess() {
-  // Mermaid 渲染
+// ── Mermaid 渲染 ──
+function renderMermaids() {
   document.querySelectorAll('.ed-mermaid').forEach((el) => {
     const div = document.createElement('div');
     div.className = 'mermaid';
@@ -247,9 +246,7 @@ function postProcess() {
         } else {
           try { const bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
         }
-        // 去掉 SVG 自带的 overflow:hidden（Mermaid 用它裁切内容）
         svg.style.overflow = 'visible';
-        // 宽度填满容器但不溢出
         svg.style.width = '100%';
         svg.style.maxWidth = '100%';
 
@@ -258,14 +255,12 @@ function postProcess() {
           const container = svg.closest('.mermaid');
           if (container) {
             const cw = container.clientWidth || 700;
-            // 按图比例算高度，clamp 在容器宽的 0.5x ~ 2x 之间
             let idealH = cw / ratio;
             idealH = Math.max(cw * 0.5, Math.min(idealH, cw * 2));
             container.style.minHeight = idealH + 'px';
             container.style.maxHeight = (cw * 2) + 'px';
           }
         }
-        // 对无明确高度的 SVG（如 stateDiagram），用内容实际高度回退
         if (!svg.getAttribute('height')) {
           try {
             const g = svg.querySelector('g');
@@ -282,8 +277,10 @@ function postProcess() {
       });
     }).catch((e) => { console.warn('enhanced-doc: Mermaid 渲染失败:', e.message); });
   }
+}
 
-  // ECharts 渲染
+// ── ECharts 渲染 ──
+function renderCharts() {
   document.querySelectorAll('.ed-chart').forEach((el) => {
     try {
       const opt = JSON.parse(el.textContent.trim());
@@ -301,8 +298,10 @@ function postProcess() {
         + e.message + '\n\n' + el.textContent + '</pre>';
     }
   });
+}
 
-  // 侧边目录
+// ── 侧边目录 ──
+function initTOC() {
   tocbot.init({
     tocSelector: '#toc', contentSelector: '#content',
     headingSelector: 'h2, h3', hasInnerContainers: true,
@@ -323,11 +322,14 @@ function postProcess() {
       if (li.classList.contains('is-collapsible')) { e.preventDefault(); li.classList.toggle('is-collapsed'); }
     });
   }
+}
 
-  // 正文章节折叠
+// ── 后处理器 ──
+function postProcess() {
+  renderMermaids();
+  renderCharts();
+  initTOC();
   enableContentCollapse();
-
-  // MathJax 重新排版（body 替换后）
   if (typeof MathJax !== 'undefined' && MathJax.typesetPromise) {
     MathJax.typesetPromise().catch(() => {});
   }
