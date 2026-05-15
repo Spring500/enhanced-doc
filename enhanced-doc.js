@@ -361,16 +361,21 @@ function enableContentCollapse() {
         h.classList.toggle('ed-collapsed');
         wrapper.classList.toggle('ed-collapsed');
         if (wasCollapsed && typeof echarts !== 'undefined') {
-          wrapper.querySelectorAll('.ed-chart').forEach((el) => {
-            const inst = echarts.getInstanceByDom(el);
-            if (inst) setTimeout(() => { inst.resize(); }, 100);
-          });
+          resizeAllCharts(wrapper);
         }
       });
       wrapLevel(wrapper, level + 1);
     });
   }
   wrapLevel(content, 2);
+}
+
+// ── 重绘所有图表 ──
+function resizeAllCharts(root) {
+  (root || document).querySelectorAll('.ed-chart').forEach((el) => {
+    const inst = echarts.getInstanceByDom(el);
+    if (inst) setTimeout(() => { inst.resize(); }, 100);
+  });
 }
 
 // ── 控件初始化（字号/主题） ──
@@ -381,10 +386,7 @@ function initControls() {
     const px = fSizes[fIdx];
     document.documentElement.style.fontSize = px + 'px';
     document.getElementById('ed-fs-label').textContent = Math.round(px / 16 * 100) + '%';
-    document.querySelectorAll('.ed-chart').forEach((el) => {
-      const inst = echarts.getInstanceByDom(el);
-      if (inst) setTimeout(() => { inst.resize(); }, 100);
-    });
+    resizeAllCharts();
   }
   document.getElementById('ed-fs-up').addEventListener('click', () => {
     fIdx = Math.min(fIdx + 1, fSizes.length - 1); applyFontSize();
@@ -414,8 +416,9 @@ function initControls() {
     const chartBg = ED_THEME === 'dark' ? 'transparent' : '#f8f9fa';
     document.querySelectorAll('.ed-chart').forEach((el) => {
       const inst = echarts.getInstanceByDom(el);
-      if (inst) { inst.setOption({ backgroundColor: chartBg }, false); setTimeout(() => { inst.resize(); }, 100); }
+      if (inst) inst.setOption({ backgroundColor: chartBg }, false);
     });
+    resizeAllCharts();
   });
 }
 
