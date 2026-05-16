@@ -35,8 +35,8 @@ test.describe('page rendering', () => {
   test('Mermaid flowchart svg exists', async ({ page }) => {
     const svgs = page.locator('.mermaid svg');
     const count = await svgs.count();
-    // flowchart + sequence + state + gantt = 4
-    expect(count).toBeGreaterThanOrEqual(4);
+    // flowchart + sequence + state + gantt + tall + wide = 6
+    expect(count).toBeGreaterThanOrEqual(6);
   });
 
   // Mermaid 容器和 ECharts 一样应有底色框和圆角，让用户能识别控件范围。
