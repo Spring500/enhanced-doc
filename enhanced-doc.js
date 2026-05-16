@@ -240,6 +240,49 @@ function buildLayout(contentHTML) {
     + '</div>';
 }
 
+// ── Mermaid SVG 后处理（样式 + svgPanZoom 初始化）──
+function postProcessMermaidSvg(svg) {
+  let w, h;
+  const vb = svg.getAttribute('viewBox');
+  const sw = svg.getAttribute('width');
+  const sh = svg.getAttribute('height');
+  if (vb) {
+    const vbParts = vb.split(/\s+/); w = parseFloat(vbParts[2]); h = parseFloat(vbParts[3]);
+  } else if (sw && sw !== '100%' && sh) {
+    w = parseFloat(sw); h = parseFloat(sh);
+  } else {
+    try { const bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
+  }
+  svg.style.overflow = 'visible';
+  svg.style.width = '100%';
+  svg.style.maxWidth = '100%';
+
+  if (w && h && w > 0 && h > 0) {
+    const ratio = w / h;
+    const container = svg.closest('.mermaid');
+    if (container) {
+      const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
+      let idealH = cw / ratio;
+      idealH = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, Math.min(idealH, cw * MERMAID_MAX_HEIGHT_RATIO));
+      container.style.minHeight = idealH + 'px';
+      container.style.maxHeight = (cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
+    }
+  }
+  if (!svg.getAttribute('height')) {
+    try {
+      const g = svg.querySelector('g');
+      if (g) {
+        const bb = g.getBBox();
+        if (bb && bb.height > 0) {
+          svg.setAttribute('height', Math.ceil(bb.height + bb.y + 10));
+        }
+      }
+    } catch(e) {}
+  }
+  try { svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
+    fit: true, center: true, minZoom: 0.25, maxZoom: 5 }); } catch(e) {}
+}
+
 // ── Mermaid 渲染 ──
 function renderMermaids() {
   document.querySelectorAll('.ed-mermaid').forEach((el) => {
@@ -251,51 +294,7 @@ function renderMermaids() {
   });
   if (document.querySelector('.mermaid')) {
     mermaid.run({ querySelector: '.mermaid' }).then(() => {
-      document.querySelectorAll('.mermaid svg').forEach((svg) => {
-        // 根据 SVG 尺寸动态设定容器高度（限制在 0.5x ~ 2x 容器宽之间）
-        let w, h;
-        const vb = svg.getAttribute('viewBox');
-        const sw = svg.getAttribute('width');
-        const sh = svg.getAttribute('height');
-        if (vb) {
-          const vbParts = vb.split(/\s+/); w = parseFloat(vbParts[2]); h = parseFloat(vbParts[3]);
-        } else if (sw && sw !== '100%' && sh) {
-          w = parseFloat(sw); h = parseFloat(sh);
-        } else {
-          try { const bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
-        }
-        // 去掉 SVG 自带的 overflow:hidden（Mermaid 用它裁切内容）
-        svg.style.overflow = 'visible';
-        // 宽度填满容器但不溢出
-        svg.style.width = '100%';
-        svg.style.maxWidth = '100%';
-
-        if (w && h && w > 0 && h > 0) {
-          const ratio = w / h;
-          const container = svg.closest('.mermaid');
-          if (container) {
-            const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
-            let idealH = cw / ratio;
-            idealH = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, Math.min(idealH, cw * MERMAID_MAX_HEIGHT_RATIO));
-            container.style.minHeight = idealH + 'px';
-            container.style.maxHeight = (cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
-          }
-        }
-        // 对无明确高度的 SVG（如 stateDiagram），用内容实际高度回退
-        if (!svg.getAttribute('height')) {
-          try {
-            const g = svg.querySelector('g');
-            if (g) {
-              const bb = g.getBBox();
-              if (bb && bb.height > 0) {
-                svg.setAttribute('height', Math.ceil(bb.height + bb.y + 10));
-              }
-            }
-          } catch(e) {}
-        }
-        try { svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
-          fit: true, center: true, minZoom: 0.25, maxZoom: 5 }); } catch(e) {}
-      });
+      document.querySelectorAll('.mermaid svg').forEach(postProcessMermaidSvg);
     }).catch((e) => { console.warn('enhanced-doc: Mermaid 渲染失败:', e.message); });
   }
 }
@@ -430,8 +429,14 @@ function initControls() {
     document.querySelectorAll('.mermaid').forEach((el) => {
       const graph = el.getAttribute('data-mermaid-src');
       if (!graph) return;
+      const oldSvg = el.querySelector('svg');
+      if (oldSvg) {
+        try { svgPanZoom(oldSvg).destroy(); } catch(e) {}
+      }
       mermaid.render('mermaid-rerender-' + (++mermaidRerenderIdx), graph).then((r) => {
         el.innerHTML = r.svg;
+        const svg = el.querySelector('svg');
+        if (svg) postProcessMermaidSvg(svg);
       }).catch((e) => { console.warn('enhanced-doc: Mermaid 主题切换失败:', e); });
     });
     const chartBg = ED_THEME === 'dark' ? 'transparent' : '#f8f9fa';
