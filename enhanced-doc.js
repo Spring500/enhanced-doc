@@ -8,10 +8,9 @@
 
 const CDN = 'https://cdn.jsdelivr.net/npm';
 
-// Mermaid 容器高度约束
+// Mermaid 容器最小高度比例
 const MERMAID_FALLBACK_WIDTH = 700;
 const MERMAID_MIN_HEIGHT_RATIO = 0.15;
-const MERMAID_MAX_HEIGHT_RATIO = 2;
 
 // ECharts 默认 grid 边距
 const CHART_GRID = { top: 70, bottom: 40, left: 50, right: 20 };
@@ -212,7 +211,7 @@ function styles() {
 .admonition-title{font-weight:bold;margin-bottom:4px}
 .admonition-body>:last-child{margin-bottom:0}
 .ed-mermaid,.ed-chart{background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}
-.mermaid{width:100%;overflow:auto;background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}
+.mermaid{width:100%;overflow:auto;background:var(--pico-card-background-color,transparent);border:1px solid var(--pico-muted-border-color);border-radius:8px;padding:8px}
 .mermaid svg{cursor:grab;display:block}
 h2.ed-collapsible,h3.ed-collapsible,h4.ed-collapsible,h5.ed-collapsible,h6.ed-collapsible{cursor:pointer;user-select:none}
 h2.ed-collapsible::before,h3.ed-collapsible::before,h4.ed-collapsible::before,h5.ed-collapsible::before,h6.ed-collapsible::before{content:"▾ ";font-size:.75em}
@@ -253,17 +252,26 @@ function postProcessMermaidSvg(svg) {
   } else {
     try { const bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
   }
-  svg.style.overflow = 'visible';
+  svg.style.overflow = vb ? 'visible' : 'hidden';
   svg.style.width = '100%';
   svg.style.maxWidth = '100%';
 
-  if (w && h && w > 0 && h > 0) {
+  if (vb && w && h && w > 0 && h > 0) {
     const ratio = w / h;
     const container = svg.closest('.mermaid');
     if (container) {
       const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
+      const proportionalH = Math.round(cw / ratio);
+      if (!svg.getAttribute('height')) {
+        svg.setAttribute('height', proportionalH);
+      }
       container.style.minHeight = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, 60) + 'px';
-      container.style.maxHeight = Math.min(cw / ratio, cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
+    }
+  } else {
+    const container = svg.closest('.mermaid');
+    if (container) {
+      container.style.minHeight = '';
+      container.style.maxHeight = '';
     }
   }
   if (!svg.getAttribute('height')) {
