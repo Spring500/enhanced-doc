@@ -27,6 +27,43 @@ test.describe('theme toggle', () => {
     const svgs = page.locator('.mermaid svg');
     await expect(svgs.first()).toBeVisible();
   });
+
+  // 主题切换后 Mermaid 的 <svg> 必须保留相同的样式设定，否则图表位置和尺寸会异常。
+  // 失败可能原因：postProcessMermaidSvg 未在主题切换 handler 中被调用。
+  test('Mermaid svg retains proper styling after theme switch', async ({ page }) => {
+    await page.locator('#ed-theme-btn').click();
+    await page.waitForTimeout(1000);
+    const svg = page.locator('.mermaid svg').first();
+    const styles = await svg.evaluate((el) => ({
+      width: el.style.width,
+      maxWidth: el.style.maxWidth,
+      overflow: el.style.overflow,
+    }));
+    expect(styles.width, 'svg.style.width 应为 "100%"，图表的宽度没有重新设定').toBe('100%');
+    expect(styles.maxWidth, 'svg.style.maxWidth 应为 "100%"，maxWidth 未重新设定').toBe('100%');
+    expect(styles.overflow, 'svg.style.overflow 应为 "visible"，Mermaid 裁切边框问题').toBe('visible');
+  });
+
+  // 主题切换后 svgPanZoom 必须重新绑定到新 <svg> 上，否则滚轮缩放失效。
+  // 失败可能原因：(a) svgPanZoom 未在主题切换 handler 中重新初始化；
+  //             (b) postProcessMermaidSvg 未被调用；(c) wheel 事件未触发缩放。
+  test('Mermaid svg zoom works after theme switch', async ({ page }) => {
+    await page.locator('#ed-theme-btn').click();
+    await page.waitForTimeout(1000);
+    const svg = page.locator('.mermaid svg').first();
+    const transformBefore = await svg.evaluate((el) => {
+      const g = el.querySelector('g');
+      return g ? g.getAttribute('transform') : null;
+    });
+    expect(transformBefore, 'svgPanZoom 未初始化，内部 <g> 没有 transform 属性').toBeTruthy();
+    await svg.dispatchEvent('wheel', { deltaY: -120, ctrlKey: true });
+    await page.waitForTimeout(300);
+    const transformAfter = await svg.evaluate((el) => {
+      const g = el.querySelector('g');
+      return g ? g.getAttribute('transform') : null;
+    });
+    expect(transformAfter, '滚轮事件未改变 <g> transform，svgPanZoom 可能未绑定 wheel 监听').not.toBe(transformBefore);
+  });
 });
 
 test.describe('font size controls', () => {
