@@ -64,6 +64,51 @@ test.describe('theme toggle', () => {
     });
     expect(transformAfter, '滚轮事件未改变 <g> transform，svgPanZoom 可能未绑定 wheel 监听').not.toBe(transformBefore);
   });
+
+  // 浅色主题下 Pico 的 --pico-card-background-color 与页面背景同为白色，
+  // 仅靠 background 无法在浅色模式下区分 Mermaid 容器边界。
+  // 失败意味着 .mermaid 在浅色模式下缺少可见边框。
+  test('Mermaid container has visible border in light mode', async ({ page }) => {
+    await page.locator('#ed-theme-btn').click(); // light
+    await page.waitForTimeout(1000);
+    const container = page.locator('.mermaid').first();
+    const border = await container.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return {
+        width: cs.borderWidth,
+        style: cs.borderStyle,
+        color: cs.borderColor,
+      };
+    });
+    expect(border.width, '浅色模式下 Mermaid 容器边框宽度应为非零，否则边界不可见')
+      .not.toBe('0px');
+    expect(border.style, '边框样式应为 solid').toBe('solid');
+    // 边框颜色不应完全透明
+    expect(border.color, '边框颜色不应透明，否则边界不可见').not.toBe('rgba(0, 0, 0, 0)');
+  });
+
+  // 多次主题切换后，Mermaid 容器的 style.maxHeight 可能残留旧值，
+  // 叠加新 SVG 尺寸变化导致 scrollHeight > clientHeight 出现滚动条。
+  // 失败意味着主题切换后容器高度约束未更新/未清除，造成视觉缺陷。
+  test('No Mermaid container has scrollbar after multiple theme switches', async ({ page }) => {
+    // 切换两次确保触发 re-render
+    await page.locator('#ed-theme-btn').click(); // light
+    await page.waitForTimeout(1000);
+    await page.locator('#ed-theme-btn').click(); // dark
+    await page.waitForTimeout(1000);
+    await page.locator('#ed-theme-btn').click(); // light
+    await page.waitForTimeout(1000);
+    const results = await page.locator('.mermaid').evaluateAll((containers) => {
+      return containers.map((el, i) => ({
+        index: i,
+        scrollable: el.scrollHeight > el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        clientHeight: el.clientHeight,
+      }));
+    });
+    const scrollable = results.filter((r) => r.scrollable);
+    expect(scrollable, `Mermaid 容器出现滚动条: ${JSON.stringify(scrollable)}`).toHaveLength(0);
+  });
 });
 
 test.describe('font size controls', () => {
