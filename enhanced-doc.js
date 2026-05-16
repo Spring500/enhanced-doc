@@ -8,10 +8,13 @@
 
 const CDN = 'https://cdn.jsdelivr.net/npm';
 
-// Mermaid 容器高度约束
-const MERMAID_FALLBACK_WIDTH = 700;
-const MERMAID_MIN_HEIGHT_RATIO = 0.15;
-const MERMAID_MAX_HEIGHT_RATIO = 2;
+// Mermaid 尺寸约束参数
+const MERMAID_FALLBACK_WIDTH = 700;        // clientWidth 不可用时的回退值
+const VIEWPORT_FACTOR = 0.7;               // 视口占比上限
+const MAX_HEIGHT_RATIO = 2;                // 高度上限 (容器宽 × 2)
+const MIN_HEIGHT_RATIO = 0.15;             // 高度下限 (容器宽 × 0.15)
+const MIN_READABLE_WIDTH_RATIO = 0.2;      // 缩小时可读宽度下限
+const ABSOLUTE_MIN_HEIGHT = 60;            // 绝对最小高度 (px)
 
 // ECharts 默认 grid 边距
 const CHART_GRID = { top: 70, bottom: 40, left: 50, right: 20 };
@@ -240,53 +243,76 @@ function buildLayout(contentHTML) {
     + '</div>';
 }
 
-// ── Mermaid SVG 后处理（样式 + svgPanZoom 初始化）──
-function postProcessMermaidSvg(svg) {
-  let w, h;
+// ── Mermaid SVG 尺寸规则（R1–R6）──
+function applyMermaidSizing(svg) {
+  let w, h, hasViewBox;
   const vb = svg.getAttribute('viewBox');
-  const sw = svg.getAttribute('width');
-  const sh = svg.getAttribute('height');
   if (vb) {
     const vbParts = vb.split(/\s+/); w = parseFloat(vbParts[2]); h = parseFloat(vbParts[3]);
-  } else if (sw && sw !== '100%' && sh) {
-    w = parseFloat(sw); h = parseFloat(sh);
+    svg.setAttribute('data-mermaid-vbw', w);
+    svg.setAttribute('data-mermaid-vbh', h);
+    hasViewBox = true;
   } else {
-    try { const bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
+    const savedW = svg.getAttribute('data-mermaid-vbw');
+    const savedH = svg.getAttribute('data-mermaid-vbh');
+    if (savedW && savedH) {
+      w = parseFloat(savedW); h = parseFloat(savedH);
+      hasViewBox = true;
+    } else {
+      const sw = svg.getAttribute('width');
+      const sh = svg.getAttribute('height');
+      if (sw && sw !== '100%' && sh) {
+        w = parseFloat(sw); h = parseFloat(sh);
+      } else {
+        try { const bb = svg.getBBox(); w = bb.width; h = bb.height; } catch(e) {}
+      }
+      hasViewBox = false;
+    }
   }
-  svg.style.overflow = vb ? 'visible' : 'hidden';
+  const container = svg.closest('.mermaid');
+  if (!container) return;
+  if (hasViewBox && w && h && w > 0 && h > 0) {
+    const ratio = w / h;
+    const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
+    const vpH = window.innerHeight;
+    const naturalH = cw / ratio;
+    let targetH;
+    if (naturalH <= vpH * VIEWPORT_FACTOR) {
+      targetH = naturalH;
+    } else {
+      targetH = vpH * VIEWPORT_FACTOR;
+      if (targetH * ratio < cw * MIN_READABLE_WIDTH_RATIO) {
+        targetH = (cw * MIN_READABLE_WIDTH_RATIO) / ratio;
+        targetH = Math.min(targetH, cw * MAX_HEIGHT_RATIO);
+      }
+    }
+    targetH = Math.max(targetH, Math.max(cw * MIN_HEIGHT_RATIO, ABSOLUTE_MIN_HEIGHT));
+    svg.setAttribute('height', Math.round(targetH));
+    container.style.minHeight = '';
+    container.style.maxHeight = '';
+  } else {
+    container.style.minHeight = '';
+    container.style.maxHeight = '';
+    if (!svg.getAttribute('height')) {
+      try {
+        const g = svg.querySelector('g');
+        if (g) {
+          const bb = g.getBBox();
+          if (bb && bb.height > 0) {
+            svg.setAttribute('height', Math.ceil(bb.height + bb.y + 10));
+          }
+        }
+      } catch(e) {}
+    }
+  }
+}
+
+// ── Mermaid SVG 后处理（样式 + 尺寸 + svgPanZoom 初始化）──
+function postProcessMermaidSvg(svg) {
+  svg.style.overflow = svg.getAttribute('viewBox') ? 'visible' : 'hidden';
   svg.style.width = '100%';
   svg.style.maxWidth = '100%';
-
-  if (vb && w && h && w > 0 && h > 0) {
-    const ratio = w / h;
-    const container = svg.closest('.mermaid');
-    if (container) {
-      const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
-      const proportionalH = Math.round(cw / ratio);
-      if (!svg.getAttribute('height')) {
-        svg.setAttribute('height', proportionalH);
-      }
-      container.style.minHeight = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, 60) + 'px';
-      container.style.maxHeight = (cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
-    }
-  } else {
-    const container = svg.closest('.mermaid');
-    if (container) {
-      container.style.minHeight = '';
-      container.style.maxHeight = '';
-    }
-  }
-  if (!svg.getAttribute('height')) {
-    try {
-      const g = svg.querySelector('g');
-      if (g) {
-        const bb = g.getBBox();
-        if (bb && bb.height > 0) {
-          svg.setAttribute('height', Math.ceil(bb.height + bb.y + 10));
-        }
-      }
-    } catch(e) {}
-  }
+  applyMermaidSizing(svg);
   try { svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
     fit: true, center: true, minZoom: 0.25, maxZoom: 5 }); } catch(e) {}
 }
@@ -452,6 +478,10 @@ function initControls() {
       const inst = echarts.getInstanceByDom(el);
       if (inst) inst.setOption({ backgroundColor: chartBg }, false);
     });
+    resizeAllCharts();
+  });
+  window.addEventListener('resize', () => {
+    document.querySelectorAll('.mermaid svg').forEach(applyMermaidSizing);
     resizeAllCharts();
   });
 }
