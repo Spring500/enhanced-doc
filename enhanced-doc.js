@@ -8,9 +8,10 @@
 
 const CDN = 'https://cdn.jsdelivr.net/npm';
 
-// Mermaid 容器最小高度比例
+// Mermaid 容器高度约束
 const MERMAID_FALLBACK_WIDTH = 700;
 const MERMAID_MIN_HEIGHT_RATIO = 0.15;
+const MERMAID_MAX_HEIGHT_RATIO = 2;
 
 // ECharts 默认 grid 边距
 const CHART_GRID = { top: 70, bottom: 40, left: 50, right: 20 };
@@ -266,6 +267,7 @@ function postProcessMermaidSvg(svg) {
         svg.setAttribute('height', proportionalH);
       }
       container.style.minHeight = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, 60) + 'px';
+      container.style.maxHeight = (cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
     }
   } else {
     const container = svg.closest('.mermaid');
