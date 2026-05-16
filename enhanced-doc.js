@@ -69,7 +69,18 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
     loadJS(CDN + '/echarts@5/dist/echarts.min.js'),
     loadJS(CDN + '/tocbot@4/dist/tocbot.min.js'),
     loadJS(CDN + '/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js'),
-    loadJS(CDN + '/mathjax@3/es5/tex-svg.js')
+    loadJS(CDN + '/mathjax@3/es5/tex-svg.js'),
+    loadJS(CDN + '/prismjs@1.29.0/prism.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-clike.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-c.min.js'),
+    loadCSS(CDN + '/prismjs@1.29.0/themes/prism-tomorrow.min.css'),
+  ]);
+}).then(() => {
+  return Promise.all([
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-cpp.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-javascript.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-python.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-bash.min.js'),
   ]);
 }).then(() => {
 
@@ -92,10 +103,14 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
   const rendered = marked.parse(markdown);
   document.head.appendChild(styles());
   document.body.innerHTML = buildLayout(rendered);
+  enhanceCodeBlocks();
 
-  // 字号/主题控件 + 后处理
+  // 字号/主题控件 + 后处理（含 Prism 高亮，给予 script 执行余量）
   initControls();
-  requestAnimationFrame(postProcess);
+  requestAnimationFrame(() => {
+    Prism.highlightAll();
+    postProcess();
+  });
 }).catch((e) => {
   document.body.innerHTML = '<pre style="color:red;padding:2rem;white-space:pre-wrap">enhanced-doc 加载失败:\n' + e.message + '</pre>';
 });
@@ -226,6 +241,12 @@ h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-co
 #ed-fontbar button{background:none;border:none;color:var(--pico-muted-color);cursor:pointer;font-size:16px;padding:0 6px;line-height:1}
 #ed-fontbar button:hover{color:var(--pico-primary)}
 #ed-fontbar .ed-fs-label{min-width:36px;text-align:center;line-height:24px}
+.ed-code-wrapper{margin:0.8em 0;border-radius:8px;overflow:hidden;border:1px solid var(--pico-muted-border-color)}
+.ed-code-header{display:flex;justify-content:space-between;align-items:center;padding:4px 12px;background:var(--pico-muted-border-color);font-size:11px;color:var(--pico-muted-color)}
+.ed-code-lang{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
+.ed-code-copy{background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;line-height:1;color:var(--pico-muted-color);transition:color .15s;margin-left:auto}
+.ed-code-copy:hover{color:var(--pico-primary)}
+.ed-code-wrapper pre{margin:0;border:none;border-radius:0}
 @media(max-width:800px){.layout{flex-direction:column}#toc{position:static;max-height:none;width:100%;border-right:none;border-bottom:1px solid var(--pico-muted-border-color)}#content{padding:1rem}}
 @media print{#toc{display:none!important}}`;
   return s;
@@ -376,6 +397,44 @@ function initTOC() {
       if (li.classList.contains('is-collapsible')) { e.preventDefault(); li.classList.toggle('is-collapsed'); }
     });
   }
+}
+
+// ── 代码块增强：语言标签 + 复制按钮 ──
+function enhanceCodeBlocks() {
+  document.querySelectorAll('#content pre').forEach((pre) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ed-code-wrapper';
+    pre.parentNode.insertBefore(wrapper, pre);
+    wrapper.appendChild(pre);
+
+    const code = pre.querySelector('code');
+    const langClass = code ? [...code.classList].find((c) => c.startsWith('language-')) : null;
+    const lang = langClass ? langClass.replace('language-', '') : null;
+
+    const header = document.createElement('div');
+    header.className = 'ed-code-header';
+
+    if (lang) {
+      const label = document.createElement('span');
+      label.className = 'ed-code-lang';
+      label.textContent = lang;
+      header.appendChild(label);
+    }
+
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'ed-code-copy';
+    copyBtn.textContent = '\uD83D\uDCCB';
+    copyBtn.addEventListener('click', () => {
+      const text = code ? code.textContent.replace(/\n+$/, '') : '';
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = '\u2713';
+        setTimeout(() => { copyBtn.textContent = '\uD83D\uDCCB'; }, 1500);
+      }).catch(() => {});
+    });
+    header.appendChild(copyBtn);
+
+    wrapper.insertBefore(header, pre);
+  });
 }
 
 // ── 后处理器 ──
