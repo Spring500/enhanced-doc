@@ -10,7 +10,7 @@ const CDN = 'https://cdn.jsdelivr.net/npm';
 
 // Mermaid 容器高度约束
 const MERMAID_FALLBACK_WIDTH = 700;
-const MERMAID_MIN_HEIGHT_RATIO = 0.5;
+const MERMAID_MIN_HEIGHT_RATIO = 0.15;
 const MERMAID_MAX_HEIGHT_RATIO = 2;
 
 // ECharts 默认 grid 边距
@@ -212,7 +212,7 @@ function styles() {
 .admonition-title{font-weight:bold;margin-bottom:4px}
 .admonition-body>:last-child{margin-bottom:0}
 .ed-mermaid,.ed-chart{background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}
-.mermaid{width:100%;overflow:auto}
+.mermaid{width:100%;overflow:auto;background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}
 .mermaid svg{cursor:grab;display:block}
 h2.ed-collapsible,h3.ed-collapsible,h4.ed-collapsible,h5.ed-collapsible,h6.ed-collapsible{cursor:pointer;user-select:none}
 h2.ed-collapsible::before,h3.ed-collapsible::before,h4.ed-collapsible::before,h5.ed-collapsible::before,h6.ed-collapsible::before{content:"▾ ";font-size:.75em}
@@ -262,10 +262,8 @@ function postProcessMermaidSvg(svg) {
     const container = svg.closest('.mermaid');
     if (container) {
       const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
-      let idealH = cw / ratio;
-      idealH = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, Math.min(idealH, cw * MERMAID_MAX_HEIGHT_RATIO));
-      container.style.minHeight = idealH + 'px';
-      container.style.maxHeight = (cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
+      container.style.minHeight = Math.max(cw * MERMAID_MIN_HEIGHT_RATIO, 60) + 'px';
+      container.style.maxHeight = Math.min(cw / ratio, cw * MERMAID_MAX_HEIGHT_RATIO) + 'px';
     }
   }
   if (!svg.getAttribute('height')) {
