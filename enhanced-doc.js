@@ -248,6 +248,9 @@ h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-co
 .ed-code-copy{background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;line-height:1;color:var(--pico-muted-color);transition:color .15s;margin-left:auto}
 .ed-code-copy:hover{color:var(--pico-primary)}
 .ed-code-wrapper pre{margin:0;border:none;border-radius:0}
+.ed-code-folded pre{display:none}
+.ed-code-fold{background:none;border:none;cursor:pointer;font-size:11px;padding:0 6px 0 0;line-height:1;color:var(--pico-muted-color);transition:color .15s}
+.ed-code-fold:hover{color:var(--pico-primary)}
 @media(max-width:800px){.layout{flex-direction:column}#toc{position:static;max-height:none;width:100%;border-right:none;border-bottom:1px solid var(--pico-muted-border-color)}#content{padding:1rem}}
 @media print{#toc{display:none!important}}`;
   return s;
@@ -414,6 +417,15 @@ function enhanceCodeBlocks() {
 
     const header = document.createElement('div');
     header.className = 'ed-code-header';
+
+    const foldBtn = document.createElement('button');
+    foldBtn.className = 'ed-code-fold';
+    foldBtn.textContent = '\u25BE'; // ▾
+    foldBtn.addEventListener('click', () => {
+      wrapper.classList.toggle('ed-code-folded');
+      foldBtn.textContent = wrapper.classList.contains('ed-code-folded') ? '\u25B8' : '\u25BE'; // ▸ : ▾
+    });
+    header.appendChild(foldBtn);
 
     if (lang) {
       const label = document.createElement('span');
