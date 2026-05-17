@@ -59,7 +59,7 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
   // ═══ 2. 并行加载其他所有库 ═══
   // MathJax 需要在加载前配置
   window.MathJax = {
-    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+    tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$'], ['\\[', '\\]']] },
     options: { ignoreHtmlClass: 'ed-mermaid|ed-chart' }
   };
 
@@ -141,6 +141,10 @@ const CHART_RE = /^:::\s*chart\s*\n([\s\S]*?)\n:::/;
 const ADMONITION_START_RE = /^!!!\s+(\w+)\s+/;
 const ADMONITION_RE = /^!!!\s+(Tip|Warning|Note|Error)\s*(.*?)\n((?:[ \t]{4,}.*\n?)*)/;
 
+// $$ math 块正则（保护 LaTeX 源码不被 Marked 转义 & 等字符）
+const MATH_BLOCK_START_RE = /^\$\$/m;
+const MATH_BLOCK_RE = /^\$\$\n?([\s\S]*?)\n?\$\$/;
+
 // ── 注册 marked 扩展 ──
 function registerMarkedExtensions() {
   // :::mermaid
@@ -196,6 +200,20 @@ function registerMarkedExtensions() {
         + titleHTML
         + '<div class="admonition-body">' + marked.parse(token.body) + '</div>'
         + '</div>';
+    }
+  }]});
+
+  // $$ 数学块：保护 LaTeX 源码不经 HTML 转义
+  marked.use({ extensions: [{
+    name: 'edMathBlock', level: 'block',
+    start: function(src) { return src.match(MATH_BLOCK_START_RE)?.index; },
+    tokenizer: function(src) {
+      const m = src.match(MATH_BLOCK_RE);
+      if (!m) return;
+      return { type: 'edMathBlock', raw: m[0], text: m[1] };
+    },
+    renderer: function(token) {
+      return '<div class="math-display">$$\n' + token.text + '\n$$</div>';
     }
   }]});
 }

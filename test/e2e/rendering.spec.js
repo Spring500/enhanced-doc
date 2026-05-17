@@ -97,8 +97,22 @@ test.describe('page rendering', () => {
   });
 
   test('block formula $$ is rendered', async ({ page }) => {
-    // 块级公式渲染为独立的 mjx-container
     await expect(page.locator('mjx-container').first()).toBeVisible();
+  });
+
+  // pmatrix 矩阵应有 2×2 结构，4 个独立单元格
+  test('pmatrix renders correct 2×2 layout with separate cells', async ({ page }) => {
+    const mtds = await page.locator('mjx-container mtd').evaluateAll((els) =>
+      els.map((e) => e.textContent.trim())
+    );
+    // 三个公式：E=mc^2, sum, matrix — matrix 的 mtd 应为 [a,b,c,d]
+    expect(mtds).toContain('a');
+    expect(mtds).toContain('b');
+    expect(mtds).toContain('c');
+    expect(mtds).toContain('d');
+    // 验证有 4 个 mtd（2 行 × 2 列）
+    const matrixMtds = mtds.filter((t) => 'abcd'.includes(t));
+    expect(matrixMtds.length, `矩阵单元格 ${JSON.stringify(matrixMtds)}`).toBe(4);
   });
 
   test('details/summary fold block exists', async ({ page }) => {
