@@ -71,16 +71,8 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
     loadJS(CDN + '/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js'),
     loadJS(CDN + '/mathjax@3/es5/tex-svg.js'),
     loadJS(CDN + '/prismjs@1.29.0/prism.min.js'),
-    loadJS(CDN + '/prismjs@1.29.0/components/prism-clike.min.js'),
-    loadJS(CDN + '/prismjs@1.29.0/components/prism-c.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js'),
     loadCSS(CDN + '/prismjs@1.29.0/themes/prism-tomorrow.min.css'),
-  ]);
-}).then(() => {
-  return Promise.all([
-    loadJS(CDN + '/prismjs@1.29.0/components/prism-cpp.min.js'),
-    loadJS(CDN + '/prismjs@1.29.0/components/prism-javascript.min.js'),
-    loadJS(CDN + '/prismjs@1.29.0/components/prism-python.min.js'),
-    loadJS(CDN + '/prismjs@1.29.0/components/prism-bash.min.js'),
   ]);
 }).then(() => {
 
@@ -105,11 +97,20 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
   document.body.innerHTML = buildLayout(rendered);
   enhanceCodeBlocks();
 
-  // 字号/主题控件 + 后处理（含 Prism 高亮，给予 script 执行余量）
+  // 字号/主题控件 + 后处理（Prism 显式预加载语言再高亮）
   initControls();
   requestAnimationFrame(() => {
-    Prism.highlightAll();
-    postProcess();
+    const langs = [...new Set(
+      [...document.querySelectorAll('pre code[class*="language-"]')]
+        .map((c) => c.className.match(/language-(\w+)/)?.[1])
+        .filter(Boolean)
+    )];
+    function highlightAndPost() { Prism.highlightAll(); postProcess(); }
+    if (langs.length && typeof Prism !== 'undefined' && Prism.plugins && Prism.plugins.autoloader) {
+      Prism.plugins.autoloader.loadLanguages(langs, highlightAndPost);
+    } else {
+      highlightAndPost();
+    }
   });
 }).catch((e) => {
   document.body.innerHTML = '<pre style="color:red;padding:2rem;white-space:pre-wrap">enhanced-doc 加载失败:\n' + e.message + '</pre>';
