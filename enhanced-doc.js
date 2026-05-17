@@ -417,14 +417,16 @@ function enhanceCodeBlocks() {
 
     const header = document.createElement('div');
     header.className = 'ed-code-header';
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', (e) => {
+      if (e.target.closest('.ed-code-copy')) return;
+      wrapper.classList.toggle('ed-code-folded');
+      foldBtn.textContent = wrapper.classList.contains('ed-code-folded') ? '\u25B8' : '\u25BE';
+    });
 
     const foldBtn = document.createElement('button');
     foldBtn.className = 'ed-code-fold';
     foldBtn.textContent = '\u25BE'; // ▾
-    foldBtn.addEventListener('click', () => {
-      wrapper.classList.toggle('ed-code-folded');
-      foldBtn.textContent = wrapper.classList.contains('ed-code-folded') ? '\u25B8' : '\u25BE'; // ▸ : ▾
-    });
     header.appendChild(foldBtn);
 
     if (lang) {
