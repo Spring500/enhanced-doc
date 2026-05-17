@@ -153,6 +153,19 @@ test.describe('font size controls', () => {
     for (let i = 0; i < 20; i++) await down.click();
     await expect(label).toHaveText('50%');
   });
+
+  // 初始加载时 root font-size 未显式设定，缩放一次后才被 applyFontSize() 写死。
+  // 若浏览器默认值与 16px 不一致，TOC 字号在初始 vs 缩放后会有差异。
+  test('font size is stable after scale-down-then-up', async ({ page }) => {
+    const tocLink = page.locator('#toc .toc-link').first();
+    const fsBefore = await tocLink.evaluate((el) => getComputedStyle(el).fontSize);
+    const down = page.locator('#ed-fs-down');
+    const up = page.locator('#ed-fs-up');
+    await down.click(); // 75%
+    await up.click();   // 100%
+    const fsAfter = await tocLink.evaluate((el) => getComputedStyle(el).fontSize);
+    expect(fsAfter, `缩放前后 TOC 字号不一致: ${fsBefore} → ${fsAfter}`).toBe(fsBefore);
+  });
 });
 
 test.describe('section collapsing', () => {

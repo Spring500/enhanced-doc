@@ -522,6 +522,7 @@ function initControls() {
   document.getElementById('ed-fs-down').addEventListener('click', () => {
     fIdx = Math.max(fIdx - 1, 0); applyFontSize();
   });
+  applyFontSize(); // 初始时显式对齐 root 字号与标签
 
   let ED_THEME = 'dark';
   let mermaidRerenderIdx = 0;
