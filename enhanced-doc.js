@@ -269,6 +269,10 @@ h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-co
 .ed-code-folded pre{display:none}
 .ed-code-fold{background:none;border:none;cursor:pointer;font-size:.6875rem;padding:0 6px 0 0;line-height:1;color:var(--pico-muted-color);transition:color .15s}
 .ed-code-fold:hover{color:var(--pico-primary)}
+.ed-mermaid-toolbar{position:absolute;top:4px;right:4px;display:flex;gap:2px;align-items:center;background:var(--pico-card-background-color);border:1px solid var(--pico-muted-border-color);border-radius:6px;padding:2px 4px;font-size:11px;color:var(--pico-muted-color);z-index:10}
+.ed-mermaid-zoom{min-width:32px;text-align:center}
+.ed-mermaid-reset{background:none;border:none;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;color:var(--pico-muted-color);transition:color .15s}
+.ed-mermaid-reset:hover{color:var(--pico-primary)}
 @media(max-width:800px){.layout{flex-direction:column}#toc{position:static;max-height:none;width:100%;border-right:none;border-bottom:1px solid var(--pico-muted-border-color)}#content{padding:1rem}}
 @media print{#toc{display:none!important}}`;
   return s;
@@ -350,14 +354,53 @@ function applyMermaidSizing(svg) {
   }
 }
 
-// ── Mermaid SVG 后处理（样式 + 尺寸 + svgPanZoom 初始化）──
+// ── Mermaid SVG 后处理（样式 + 尺寸 + svgPanZoom 初始化 + 工具栏）──
 function postProcessMermaidSvg(svg) {
   svg.style.overflow = svg.getAttribute('viewBox') ? 'visible' : 'hidden';
   svg.style.width = '100%';
   svg.style.maxWidth = '100%';
   applyMermaidSizing(svg);
-  try { svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
+  let instance;
+  try { instance = svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
     fit: true, center: true, minZoom: 0.25, maxZoom: 5 }); } catch(e) {}
+  if (!instance) return;
+  svg.__szInstance = instance;
+
+  const container = svg.closest('.mermaid');
+  if (!container) return;
+
+  // 已有工具栏则跳过（主题切换时 postProcessMermaidSvg 可能多次调用）
+  if (container.querySelector('.ed-mermaid-toolbar')) return;
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'ed-mermaid-toolbar';
+
+  const zoomLabel = document.createElement('span');
+  zoomLabel.className = 'ed-mermaid-zoom';
+  function updateZoom() {
+    try { zoomLabel.textContent = Math.round(instance.getZoom() * 100) + '%'; } catch(e) {}
+  }
+  updateZoom();
+
+  const resetBtn = document.createElement('button');
+  resetBtn.className = 'ed-mermaid-reset';
+  resetBtn.textContent = '\u21BA'; // ↺
+  resetBtn.title = '重置缩放与位置';
+  resetBtn.addEventListener('click', () => {
+    try { instance.fit(); instance.center(); updateZoom(); } catch(e) {}
+  });
+
+  toolbar.appendChild(zoomLabel);
+  toolbar.appendChild(resetBtn);
+  container.style.position = 'relative';
+  container.appendChild(toolbar);
+
+  // 监听缩放更新显示
+  svg.addEventListener('wheel', () => { setTimeout(updateZoom, 50); });
+  svg.addEventListener('mousedown', () => {
+    const onUp = () => { setTimeout(updateZoom, 50); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mouseup', onUp);
+  });
 }
 
 // ── Mermaid 渲染 ──
@@ -574,7 +617,10 @@ function initControls() {
     resizeAllCharts();
   });
   window.addEventListener('resize', () => {
-    document.querySelectorAll('.mermaid svg').forEach(applyMermaidSizing);
+    document.querySelectorAll('.mermaid svg').forEach((svg) => {
+      applyMermaidSizing(svg);
+      try { if (svg.__szInstance) svg.__szInstance.resize(); } catch(e) {}
+    });
     resizeAllCharts();
   });
 }
