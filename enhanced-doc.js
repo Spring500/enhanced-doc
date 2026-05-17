@@ -212,7 +212,7 @@ function styles() {
 .toc-link{color:var(--pico-muted-color);text-decoration:none;display:block;padding:.28rem 0;border-radius:4px;transition:color .15s}
 .toc-link:hover{color:var(--pico-color)}
 .is-active-link{color:var(--pico-primary)!important;font-weight:600}
-.toc-list{list-style:none;padding:0;margin:0;font-size:.88rem}
+.toc-list{list-style:none;padding:0;margin:0;font-size:1rem}
 .toc-list .toc-list{padding-left:1rem}
 .is-collapsible>.toc-link{cursor:pointer}
 .is-collapsible>.toc-link::before{content:"▾ ";font-size:.75rem}
@@ -243,13 +243,13 @@ h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-co
 #ed-fontbar button:hover{color:var(--pico-primary)}
 #ed-fontbar .ed-fs-label{min-width:36px;text-align:center;line-height:24px}
 .ed-code-wrapper{margin:0.8em 0;border-radius:8px;overflow:hidden;border:1px solid var(--pico-muted-border-color)}
-.ed-code-header{display:flex;justify-content:space-between;align-items:center;padding:4px 12px;background:var(--pico-muted-border-color);font-size:11px;color:var(--pico-muted-color)}
-.ed-code-lang{font-size:10px;text-transform:uppercase;letter-spacing:.5px}
-.ed-code-copy{background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;line-height:1;color:var(--pico-muted-color);transition:color .15s;margin-left:auto}
+.ed-code-header{display:flex;justify-content:space-between;align-items:center;padding:4px 12px;background:var(--pico-muted-border-color);font-size:.6875rem;color:var(--pico-muted-color)}
+.ed-code-lang{font-size:.625rem;text-transform:uppercase;letter-spacing:.5px}
+.ed-code-copy{background:none;border:none;cursor:pointer;font-size:.8125rem;padding:0 4px;line-height:1;color:var(--pico-muted-color);transition:color .15s;margin-left:auto}
 .ed-code-copy:hover{color:var(--pico-primary)}
 .ed-code-wrapper pre{margin:0;border:none;border-radius:0}
 .ed-code-folded pre{display:none}
-.ed-code-fold{background:none;border:none;cursor:pointer;font-size:11px;padding:0 6px 0 0;line-height:1;color:var(--pico-muted-color);transition:color .15s}
+.ed-code-fold{background:none;border:none;cursor:pointer;font-size:.6875rem;padding:0 6px 0 0;line-height:1;color:var(--pico-muted-color);transition:color .15s}
 .ed-code-fold:hover{color:var(--pico-primary)}
 @media(max-width:800px){.layout{flex-direction:column}#toc{position:static;max-height:none;width:100%;border-right:none;border-bottom:1px solid var(--pico-muted-border-color)}#content{padding:1rem}}
 @media print{#toc{display:none!important}}`;

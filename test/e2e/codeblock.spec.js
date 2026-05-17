@@ -77,8 +77,9 @@ test.describe('codeblock: language labels', () => {
     expect(langNames).toContain('js');
     expect(langNames).toContain('python');
     expect(langNames).toContain('bash');
+    const bodyFS = await page.evaluate(() => parseFloat(getComputedStyle(document.body).fontSize));
     for (const l of labels) {
-      expect(parseFloat(l.fs), `${l.text} 标签字号 ${l.fs} > 12px`).toBeLessThanOrEqual(12);
+      expect(parseFloat(l.fs), `${l.text} 标签字号 ${l.fs} ≥ 正文 ${bodyFS}`).toBeLessThan(bodyFS);
     }
   });
 
