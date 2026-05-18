@@ -4,12 +4,14 @@ test.describe('codeblock: syntax highlighting', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/index.html');
     await page.waitForSelector('pre code', { timeout: 15000 });
+    await page.waitForSelector('code.language-js .token', { timeout: 10000 });
   });
 
   test('cpp keywords wrapped in token.keyword spans', async ({ page }) => {
     const tokens = await page.locator('code.language-cpp .token.keyword').evaluateAll((els) =>
       els.map((e) => e.textContent)
     );
+    expect(tokens.length, 'cpp 高亮失败：code.language-cpp 内未找到 .token.keyword 元素').toBeGreaterThan(0);
     expect(tokens).toContain('for');
     expect(tokens).toContain('int');
     expect(tokens).toContain('void');
@@ -20,6 +22,7 @@ test.describe('codeblock: syntax highlighting', () => {
       els.map((e) => e.textContent)
     );
     const allText = strings.join('');
+    expect(allText, 'js 高亮失败：未找到 .token.string 元素或内容为空').not.toBe('');
     expect(allText).toContain('Hello');
   });
 
@@ -27,6 +30,7 @@ test.describe('codeblock: syntax highlighting', () => {
     const keywords = await page.locator('code.language-python .token.keyword').evaluateAll((els) =>
       els.map((e) => e.textContent)
     );
+    expect(keywords.length, 'python 高亮失败：code.language-python 内未找到 .token.keyword 元素').toBeGreaterThan(0);
     expect(keywords).toContain('import');
     expect(keywords).toContain('def');
     expect(keywords).toContain('return');
@@ -34,6 +38,7 @@ test.describe('codeblock: syntax highlighting', () => {
     const comments = await page.locator('code.language-python .token.comment').evaluateAll((els) =>
       els.map((e) => e.textContent)
     );
+    expect(comments.length, 'python 高亮失败：code.language-python 内未找到 .token.comment 元素').toBeGreaterThan(0);
     expect(comments.some((c) => c.includes('返回问候语'))).toBe(true);
   });
 
@@ -41,11 +46,13 @@ test.describe('codeblock: syntax highlighting', () => {
     const builtins = await page.locator('code.language-bash .token.builtin').evaluateAll((els) =>
       els.map((e) => e.textContent)
     );
+    expect(builtins.length, 'bash 高亮失败：code.language-bash 内未找到 .token.builtin 元素').toBeGreaterThan(0);
     expect(builtins).toContain('echo');
 
     const comments = await page.locator('code.language-bash .token.comment').evaluateAll((els) =>
       els.map((e) => e.textContent)
     );
+    expect(comments.length, 'bash 高亮失败：code.language-bash 内未找到 .token.comment 元素').toBeGreaterThan(0);
     expect(comments.some((c) => c.includes('这是一个注释'))).toBe(true);
   });
 
