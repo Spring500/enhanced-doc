@@ -15,6 +15,7 @@ const MAX_HEIGHT_RATIO = 2;                // 高度上限 (容器宽 × 2)
 const MIN_HEIGHT_RATIO = 0.15;             // 高度下限 (容器宽 × 0.15)
 const MIN_READABLE_WIDTH_RATIO = 0.2;      // 缩小时可读宽度下限
 const ABSOLUTE_MIN_HEIGHT = 60;            // 绝对最小高度 (px)
+const MERMAID_FONT_SIZE = 14;              // viewBox 坐标中 Mermaid 文字大小
 
 // ECharts 默认 grid 边距
 const CHART_GRID = { top: 70, bottom: 40, left: 50, right: 20 };
@@ -322,7 +323,14 @@ function applyMermaidSizing(svg) {
     const ratio = w / h;
     const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
     const vpH = window.innerHeight;
-    const naturalH = cw / ratio;
+    // R0: 正文等宽 — Mermaid 文字与正文字号匹配
+    const bodyFS = parseFloat(getComputedStyle(document.body).fontSize);
+    const textMatchWidth = Math.round(w * bodyFS / MERMAID_FONT_SIZE);
+    svg.style.maxWidth = textMatchWidth + 'px';
+    // R1: 以有效宽度算自然高度
+    const contentW = cw - 16; // border-box 下 content area = cw − padding
+    const effectiveW = Math.min(contentW, textMatchWidth);
+    const naturalH = effectiveW / ratio;
     let targetH;
     if (naturalH <= vpH * VIEWPORT_FACTOR) {
       targetH = naturalH;
@@ -361,8 +369,10 @@ function postProcessMermaidSvg(svg) {
   svg.style.maxWidth = '100%';
   applyMermaidSizing(svg);
   let instance;
-  try { instance = svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
-    fit: true, center: true, minZoom: 0.25, maxZoom: 5 }); } catch(e) {}
+  try {
+    instance = svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
+      fit: true, center: true, minZoom: 0.25, maxZoom: 5 });
+  } catch(e) {}
   if (!instance) return;
   svg.__szInstance = instance;
 
@@ -575,6 +585,10 @@ function initControls() {
     const px = fSizes[fIdx];
     document.documentElement.style.fontSize = px + 'px';
     document.getElementById('ed-fs-label').textContent = Math.round(px / 16 * 100) + '%';
+    document.querySelectorAll('.mermaid svg').forEach((svg) => {
+      applyMermaidSizing(svg);
+      try { if (svg.__szInstance) svg.__szInstance.resize(); } catch(e) {}
+    });
     resizeAllCharts();
   }
   document.getElementById('ed-fs-up').addEventListener('click', () => {

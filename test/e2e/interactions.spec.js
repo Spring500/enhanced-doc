@@ -40,7 +40,7 @@ test.describe('theme toggle', () => {
       overflow: el.style.overflow,
     }));
     expect(styles.width, 'svg.style.width 应为 "100%"，图表的宽度没有重新设定').toBe('100%');
-    expect(styles.maxWidth, 'svg.style.maxWidth 应为 "100%"，maxWidth 未重新设定').toBe('100%');
+    expect(styles.maxWidth, 'svg.style.maxWidth 缺失，R0 未在主题切换后重新应用').not.toBe('');
     expect(styles.overflow, 'svg.style.overflow 应为 "visible"，Mermaid 裁切边框问题').toBe('visible');
   });
 

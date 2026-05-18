@@ -15,13 +15,16 @@ import { test, expect } from '@playwright/test';
  *   C4 — 字不能缩没：缩进一屏时宽度 ≥ 容器 20%
  *
  * 规则（对每个有 viewBox 的 SVG，按顺序）：
- *   R1. naturalH = cw / (vbW / vbH)
+ *   R0. bodyFS = getComputedStyle(body).fontSize px值
+ *       正文等宽 = vbW × bodyFS / 14
+ *       svg.style.maxWidth = 正文等宽 + 'px'
+ *   R1. effectiveW = min(contentW, 正文等宽)
+ *       naturalH = effectiveW / (vbW / vbH)
  *   R2. IF naturalH ≤ vpH * 0.7 → targetH = naturalH, goto END
  *   R3. targetH = vpH * 0.7，等比缩宽度
  *   R4. IF targetW ≥ cw * 0.2 → targetH 确定, goto END
  *   R5. 回退：targetH = (cw * 0.2) / (vbW / vbH)
- *        targetH = min(targetH, cw * 2)      // 比例上限
- *        targetH = max(targetH, cw * 0.15)   // 兜底
+ *        targetH = min(targetH, cw * 2)
  *        goto END
  *   R6. targetH = max(targetH, max(cw * 0.15, 60))
  *
@@ -173,5 +176,54 @@ test.describe('mermaid sizing rules', () => {
     const svg = page.locator('.mermaid').nth(2).locator('svg');
     const h = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().height));
     expect(h, `主题切换后状态图高度 ${h} > ${VPH_LIMIT}`).toBeLessThanOrEqual(VPH_LIMIT);
+  });
+});
+
+test.describe('mermaid R0 text-match scaling', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/index.html');
+    await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+  });
+
+  // R0-Z1: 正文等宽约束生效，宽屏下 SVG maxWidth 被限制
+  test('SVG maxWidth is capped at text-match width on wide viewport', async ({ page }) => {
+    const svg = page.locator('.mermaid').nth(0).locator('svg');
+    const w = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    // 默认 1280px 视图下，流程图应 < 650px（正文等宽 ≈632px）
+    expect(w, `流程图宽度 ${w} > 650，R0 未生效`).toBeLessThanOrEqual(650);
+    // 但不应过小
+    expect(w, `流程图宽度 ${w} < 300`).toBeGreaterThan(300);
+  });
+
+  // R0-Z2: 宽屏下 SVG 宽度不应超过容器宽的 70%，证明正文等宽约束有效
+  test('SVG width is significantly below container width on wide viewport', async ({ page }) => {
+    const data = await page.locator('.mermaid').evaluateAll((els) => {
+      return els.map((el, i) => {
+        const svg = el.querySelector('svg');
+        if (!svg) return { index: i, skip: true };
+        const svgW = Math.round(svg.getBoundingClientRect().width);
+        const cW = el.clientWidth;
+        return { index: i, svgW, containerW: cW, ratio: svgW / cW };
+      });
+    });
+    // 前 3 张图（有 viewBox，宽屏）SVG 宽应 ≤ 容器宽的 70%，跳过 Gantt（index 3, 无 viewBox）
+    for (const d of data.slice(0, 3)) {
+      if (d.skip) continue;
+      expect(d.ratio, `图[${d.index}] SVG ${d.svgW}px / 容器 ${d.containerW}px = ${d.ratio} > 0.7`)
+        .toBeLessThanOrEqual(0.7);
+    }
+  });
+
+  // R0-Z3: 字号缩放后 R0 重新计算
+  test('font size change re-triggers R0 text-match cap', async ({ page }) => {
+    const svg = page.locator('.mermaid').nth(0).locator('svg');
+    const wBefore = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+
+    await page.locator('#ed-fs-down').click(); // 75% → bodyFS = 12
+    await page.waitForTimeout(500);
+    const wAfter = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+
+    // 字号缩小后正文等宽更小，SVG 应更窄
+    expect(wAfter, `字号缩小后宽度 ${wAfter} ≥ 缩小前 ${wBefore}`).toBeLessThan(wBefore);
   });
 });
