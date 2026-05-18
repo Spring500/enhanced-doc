@@ -15,6 +15,7 @@ window.mermaid = {
   initialize: () => {},
   run: () => Promise.resolve(),
   render: () => Promise.resolve({ svg: '<svg></svg>' }),
+  registerLayoutLoaders: () => {},
 };
 
 window.echarts = {

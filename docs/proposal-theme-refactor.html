@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+<script type="text/x-markdown">
+
+# 倡议：Mermaid 主题切换机制改造
+
+`2026-05-18` · enhanced-doc · 草稿
+
+---
+
+## 1. 目的与价值
+
+本倡议提出对 enhanced-doc 的 Mermaid 主题切换机制进行改造，借鉴 [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) 项目的 **CSS 自定义属性主题系统** 和 **双色推导体系**，解决当前方案的三个核心问题：
+
+| 问题 | 影响 | 改造后预期 |
+|------|------|-----------|
+| 切主题需全量重渲染 SVG | 闪烁、卡顿、用户体验差 | CSS 变量覆盖，零重渲染 |
+| 暗色/亮色只用 mermaid 内置主题 | 配色粗糙，与文档整体风格脱节 | 双色推导，配色自动协调 |
+| 初始化配色与切换配色不一致 | 切主题后丢失自定义色值 | 统一配色数据源，一处定义全局生效 |
+
+---
+
+## 2. 现状分析
+
+### 2.1 初始化配色（`enhanced-doc.js:80-88`）
+
+初次加载时，mermaid 使用硬编码的 `themeVariables` 初始化：
+
+```javascript
+mermaid.initialize({
+  startOnLoad: false, theme: 'dark',
+  themeVariables: {
+    primaryColor: '#2a3555', primaryBorderColor: '#5b8def',
+    primaryTextColor: '#e1e4ed', lineColor: '#5b8def', fontSize: '14px'
+  },
+  flowchart: { useMaxWidth: false, htmlLabels: false, curve: 'basis' },
+  sequence: { useMaxWidth: false }
+});
+```
+
+这段配置定义了 4 个自定义色值（`primaryColor`、`primaryBorderColor`、`primaryTextColor`、`lineColor`），但只在初次渲染时生效。
+
+### 2.2 主题切换逻辑（`enhanced-doc.js:588-618`）
+
+点击主题按钮时的完整流程：
+
+```javascript
+const MERMAID_THEMES = {
+  dark:  { theme: 'dark',    themeVariables: { fontSize: '14px' } },
+  light: { theme: 'default', themeVariables: { fontSize: '14px' } }
+};
+// 点击时：
+mermaid.initialize({ startOnLoad: false, ...MERMAID_THEMES[ED_THEME] });
+document.querySelectorAll('.mermaid').forEach((el) => {
+  const graph = el.getAttribute('data-mermaid-src');
+  // ... 销毁 svgPanZoom → mermaid.render() → 替换 innerHTML → 重新后处理
+});
+```
+
+**问题清单：**
+
+1. **配色丢失**：切换时的 `MERMAID_THEMES` 只传了 `fontSize`，初始化时的 4 个自定义色值 (`primaryColor` 等) 完全丢失。切到 light 再切回 dark，配色与初始状态不同。
+
+2. **全量重渲染**：每次切主题遍历所有 `.mermaid` 容器，逐个调用 `mermaid.render()` 异步生成新 SVG，再替换 `innerHTML`。N 个图表 = N 次异步渲染 + N 次 DOM 替换。
+
+3. **svgPanZoom 状态丢失**：重渲染前必须 `destroy()` 旧实例，渲染后重新初始化。用户的缩放/平移位置全部丢失。
+
+4. **闪烁**：从销毁旧 SVG 到新 SVG 渲染完成之间存在空白间隔，页面闪烁。
+
+### 2.3 ECharts 主题切换（`enhanced-doc.js:612-616`）
+
+对比之下，ECharts 的主题切换非常轻量——只改背景色，不重新渲染：
+
+```javascript
+const chartBg = ED_THEME === 'dark' ? 'transparent' : '#f8f9fa';
+document.querySelectorAll('.ed-chart').forEach((el) => {
+  const inst = echarts.getInstanceByDom(el);
+  if (inst) inst.setOption({ backgroundColor: chartBg }, false);
+});
+```
+
+Mermaid 理论上也能做到类似的轻量切换，前提是 SVG 的颜色引用从硬编码值改为 CSS 自定义属性。
+
+---
+
+## 3. 借鉴方案：beautiful-mermaid 双色推导体系
+
+[beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid)（MIT 协议，Craft Docs 团队开发，9.4k stars）实现了一套优雅的 CSS 自定义属性主题系统。以下是其核心设计，附具体代码位置。
+
+### 3.1 双色基础：`bg` + `fg`
+
+整个主题只需要两个必填色值：背景色 (`bg`) 和前景色 (`fg`)。所有其他颜色都是从这两个值通过 CSS `color-mix()` 函数自动推导出来的。
+
+**类型定义**（`src/theme.ts` DiagramColors 接口）：
+
+```typescript
+export interface DiagramColors {
+  bg: string    // 背景色 → CSS 变量 --bg
+  fg: string    // 前景色 → CSS 变量 --fg
+  // 可选增强色（未设置时回退到 color-mix 推导）
+  line?: string    // 连接线颜色 → --line
+  accent?: string  // 箭头/高亮 → --accent
+  muted?: string   // 次要文字 → --muted
+  surface?: string // 节点填充 → --surface
+  border?: string  // 节点边框 → --border
+}
+```
+
+设计哲学：给任意两个颜色，都能自动生成视觉协调的完整配色方案。可选的 5 个增强色用于需要更丰富配色的场景（如编辑器主题映射），但不是必须的。
+
+### 3.2 混合权重常量：MIX
+
+**权重定义**（`src/theme.ts` MIX 常量）：
+
+```typescript
+export const MIX = {
+  text:         100,  // 主文本：直接用 --fg
+  textSec:      60,   // 次要文本：fg 混入 60% 
+  textMuted:    40,   // 淡化文本：fg 混入 40%
+  textFaint:    25,   // 极淡文本：fg 混入 25%
+  line:         50,   // 连接线：fg 混入 50%
+  arrow:        85,   // 箭头：fg 混入 85%
+  nodeFill:     3,    // 节点填充：fg 混入 3%（几乎是纯背景色）
+  nodeStroke:   20,   // 节点边框：fg 混入 20%
+  groupHeader:  5,    // 分组头部：fg 混入 5%
+  innerStroke:  12,   // 内部分隔线：fg 混入 12%
+  keyBadge:     10,   // ER 图键标记：fg 混入 10%
+} as const
+```
+
+这些权重值经过视觉调校，确保在任意 bg/fg 组合下都能产出层次分明、可读性良好的配色。数值越大越接近前景色，越小越接近背景色。
+
+### 3.3 CSS 变量推导引擎：buildStyleBlock
+
+**核心推导逻辑**（`src/theme.ts` buildStyleBlock 函数）：
+
+```typescript
+export function buildStyleBlock(font: string, hasMonoFont: boolean): string {
+  // ... font imports ...
+  const derivedVars = `
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) ${MIX.textSec}%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) ${MIX.textMuted}%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) ${MIX.textFaint}%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) ${MIX.line}%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) ${MIX.arrow}%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) ${MIX.nodeFill}%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) ${MIX.nodeStroke}%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) ${MIX.groupHeader}%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) ${MIX.innerStroke}%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) ${MIX.keyBadge}%, var(--bg));`
+  // ...
+}
+```
+
+**关键设计点**：
+
+- 使用 `--_` 前缀表示"私有/派生"变量，不鼓励外部直接覆盖
+- 每个派生变量都有 `var(--xxx, fallback)` 结构：如果对应的可选增强色已设置则直接用，否则回退到 `color-mix()` 推导
+- `color-mix(in srgb, var(--fg) N%, var(--bg))` 的语义是：在 sRGB 色彩空间中，将前景色混入 N% 到背景色中
+
+### 3.4 SVG 入口标签注入：svgOpenTag
+
+**变量注入点**（`src/theme.ts` svgOpenTag 函数）：
+
+```typescript
+export function svgOpenTag(
+  width: number, height: number,
+  colors: DiagramColors, transparent?: boolean
+): string {
+  const vars = [
+    `--bg:${colors.bg}`,
+    `--fg:${colors.fg}`,
+    colors.line    ? `--line:${colors.line}` : '',
+    colors.accent  ? `--accent:${colors.accent}` : '',
+    colors.muted   ? `--muted:${colors.muted}` : '',
+    colors.surface ? `--surface:${colors.surface}` : '',
+    colors.border  ? `--border:${colors.border}` : '',
+  ].filter(Boolean).join(';')
+  const bgStyle = transparent ? '' : ';background:var(--bg)'
+  return `<svg ... style="${vars}${bgStyle}">`
+}
+```
+
+颜色通过 `style` 属性直接设置在 `<svg>` 根元素上，而非烧进每个图形元素。这意味着 **切主题只需修改 `<svg>` 的 `style` 属性**，所有内部元素通过 CSS 变量级联自动更新。
+
+### 3.5 渲染器中的变量引用
+
+**实际使用**（`src/renderer.ts` renderNodeShape 函数）：
+
+```typescript
+function renderNodeShape(node: PositionedNode): string {
+  const fill = escapeAttr(inlineStyle?.fill ?? 'var(--_node-fill)')
+  const stroke = escapeAttr(inlineStyle?.stroke ?? 'var(--_node-stroke)')
+  // ...
+}
+```
+
+以及箭头定义（`src/renderer.ts` arrowMarkerDefs 函数）：
+
+```typescript
+function arrowMarkerDefs(): string {
+  const arrowStyle = 'fill="var(--_arrow)" stroke="var(--_arrow)" ...'
+  // ...
+}
+```
+
+所有图形元素都引用 `var(--_xxx)` 派生变量，没有任何硬编码颜色值。
+
+### 3.6 15 个内置主题
+
+**主题定义**（`src/theme.ts` THEMES 常量）展示了双色 vs 增强色的搭配：
+
+```typescript
+export const THEMES: Record<string, DiagramColors> = {
+  // 纯双色主题：只需 bg + fg
+  'zinc-light': { bg: '#FFFFFF', fg: '#27272A' },
+  'zinc-dark':  { bg: '#18181B', fg: '#FAFAFA' },
+  // 增强色主题：bg + fg + 可选增强
+  'tokyo-night': {
+    bg: '#1a1b26', fg: '#a9b1d6',
+    line: '#3d59a1', accent: '#7aa2f7', muted: '#565f89',
+  },
+  'dracula': {
+    bg: '#282a36', fg: '#f8f8f2',
+    line: '#6272a4', accent: '#bd93f9', muted: '#6272a4',
+  },
+  // ... 共 15 个
+}
+```
+
+---
+
+## 4. 改造方案
+
+### 4.1 阶段一：统一配色数据源（低成本，高收益）
+
+**目标**：消除初始化配色与切换配色不一致的问题。
+
+**做法**：定义一个统一的配色映射表，让初始化和切换共用同一数据源。
+
+```javascript
+const ED_COLOR_SCHEMES = {
+  dark: {
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#2a3555',
+      primaryBorderColor: '#5b8def',
+      primaryTextColor: '#e1e4ed',
+      lineColor: '#5b8def',
+      fontSize: '14px'
+    }
+  },
+  light: {
+    theme: 'default',
+    themeVariables: {
+      primaryColor: '#e8ecf4',
+      primaryBorderColor: '#4a7dd6',
+      primaryTextColor: '#2d3748',
+      lineColor: '#4a7dd6',
+      fontSize: '14px'
+    }
+  }
+};
+```
+
+初始化和切换都从 `ED_COLOR_SCHEMES[ED_THEME]` 读取，确保一致性。
+
+### 4.2 阶段二：SVG 后处理注入 CSS 变量（中成本，高收益）
+
+**目标**：实现 mermaid SVG 的 CSS 变量主题切换，避免全量重渲染。
+
+**核心思路**：mermaid 官方渲染器生成的 SVG 使用硬编码颜色。我们可以在 `postProcessMermaidSvg` 阶段注入 CSS 变量覆盖层，使后续主题切换只需改变变量值。
+
+**做法**：
+
+1. 在 SVG 渲染完成后，向 `<svg>` 元素注入一个 `<style>` 块，用 CSS 选择器覆盖关键颜色属性
+2. 在 `<svg>` 的 `style` 属性上设置 `--bg` 和 `--fg` 变量
+3. 切主题时只更新这两个变量，触发级联更新
+
+**借鉴 beautiful-mermaid 的推导公式**：
+
+```css
+svg.mermaid-themed {
+  --_text: var(--fg);
+  --_line: color-mix(in srgb, var(--fg) 50%, var(--bg));
+  --_node-fill: color-mix(in srgb, var(--fg) 3%, var(--bg));
+  --_node-stroke: color-mix(in srgb, var(--fg) 20%, var(--bg));
+}
+svg.mermaid-themed text { fill: var(--_text) !important; }
+svg.mermaid-themed .node rect,
+svg.mermaid-themed .node circle,
+svg.mermaid-themed .node polygon { fill: var(--_node-fill) !important; stroke: var(--_node-stroke) !important; }
+svg.mermaid-themed .edgePath .path { stroke: var(--_line) !important; }
+svg.mermaid-themed marker path { fill: var(--_line) !important; }
+```
+
+!!! Warning 注意
+    此方案需要充分测试 mermaid 生成的 SVG 内部 class 结构，确保选择器能正确匹配。不同 mermaid 版本的 SVG 结构可能不同。
+
+### 4.3 阶段三：主题切换零重渲染（阶段二成功后）
+
+**目标**：切主题时不再调用 `mermaid.render()`，只更新 CSS 变量。
+
+**改造后的切换逻辑**：
+
+```javascript
+document.getElementById('ed-theme-btn').addEventListener('click', () => {
+  ED_THEME = ED_THEME === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = ED_THEME;
+  // Mermaid：只改 CSS 变量，不重渲染
+  const colors = ED_THEME === 'dark'
+    ? { bg: '#1a1b26', fg: '#e1e4ed' }
+    : { bg: '#ffffff', fg: '#2d3748' };
+  document.querySelectorAll('.mermaid svg').forEach((svg) => {
+    svg.style.setProperty('--bg', colors.bg);
+    svg.style.setProperty('--fg', colors.fg);
+  });
+  // svgPanZoom 状态完全保留，无需 destroy/reinit
+});
+```
+
+**收益**：
+
+- 切换瞬间完成，零闪烁
+- svgPanZoom 实例和用户的缩放/平移状态完全保留
+- 代码量大幅减少
+
+### 4.4 预期改造成本
+
+| 阶段 | 工作量 | 风险 | 收益 |
+|------|--------|------|------|
+| 阶段一 | 0.5 天 | 低 | 消除配色不一致 bug |
+| 阶段二 | 2-3 天 | 中（需适配 mermaid SVG 结构） | CSS 变量覆盖就位 |
+| 阶段三 | 0.5 天 | 低（建立在阶段二基础上） | 零重渲染主题切换 |
+
+---
+
+## 5. 参考资料
+
+| 项目 | 地址 | 协议 |
+|------|------|------|
+| beautiful-mermaid | https://github.com/lukilabs/beautiful-mermaid | MIT |
+| mermaid | https://github.com/mermaid-js/mermaid | MIT |
+| enhanced-doc 当前代码 | `enhanced-doc.js:80-88`（初始化）、`588-618`（主题切换） | — |
+
+### 关键源码位置（beautiful-mermaid）
+
+| 文件 | 内容 |
+|------|------|
+| `src/theme.ts` — DiagramColors 接口 | 双色 + 5 可选增强色的类型定义 |
+| `src/theme.ts` — MIX 常量 | 12 个 color-mix 权重值 |
+| `src/theme.ts` — buildStyleBlock() | CSS 变量推导引擎，生成 `<style>` 块 |
+| `src/theme.ts` — svgOpenTag() | 将颜色作为 CSS 变量注入 `<svg>` style 属性 |
+| `src/theme.ts` — THEMES 常量 | 15 个内置主题定义 |
+| `src/theme.ts` — fromShikiTheme() | 从 VS Code 主题提取配色的映射逻辑 |
+| `src/renderer.ts` — renderNodeShape() | 图形元素通过 `var(--_xxx)` 引用派生变量 |
+| `src/renderer.ts` — arrowMarkerDefs() | 箭头使用 `var(--_arrow)` 引用 |
+
+</script>
+<script src="http://aizen.sun.kuro.com/enhanced-doc.js"></script>
+</body>
+</html>

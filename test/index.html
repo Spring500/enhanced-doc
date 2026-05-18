@@ -174,7 +174,98 @@ flowchart LR
 
 ---
 
-## 8. ECharts 散点图
+## 8. ELK 布局对比案例
+
+以下案例在 dagre 下容易出现边交叉、节点重叠等问题，ELK 的正交路由和高级交叉最小化应明显优于 dagre。
+
+### 8.1 复杂交叉边（多对多依赖）
+
+:::mermaid
+flowchart TD
+  A[前端] --> D[API 网关]
+  A --> E[CDN]
+  B[移动端] --> D
+  B --> F[推送服务]
+  C[桌面端] --> D
+  C --> E
+  D --> G[用户服务]
+  D --> H[订单服务]
+  D --> I[支付服务]
+  E --> J[对象存储]
+  F --> G
+  G --> K[(数据库)]
+  H --> K
+  H --> I
+  I --> L[第三方支付]
+  I --> K
+  J --> K
+:::
+
+### 8.2 嵌套子图（微服务架构）
+
+:::mermaid
+flowchart LR
+  subgraph Client["客户端层"]
+    direction TB
+    Web[Web App]
+    Mobile[Mobile App]
+  end
+  subgraph Gateway["网关层"]
+    direction TB
+    LB[负载均衡]
+    Auth[认证中间件]
+    LB --> Auth
+  end
+  subgraph Services["业务服务层"]
+    direction TB
+    subgraph Core["核心服务"]
+      UserSvc[用户服务]
+      OrderSvc[订单服务]
+    end
+    subgraph Support["支撑服务"]
+      NotifySvc[通知服务]
+      LogSvc[日志服务]
+    end
+    Core --> Support
+  end
+  subgraph Data["数据层"]
+    direction TB
+    PG[(PostgreSQL)]
+    Redis[(Redis)]
+    MQ[消息队列]
+  end
+  Client --> Gateway
+  Gateway --> Services
+  Services --> Data
+:::
+
+### 8.3 多分支汇聚（CI/CD 流水线）
+
+:::mermaid
+flowchart TD
+  Trigger[代码推送] --> Lint[代码检查]
+  Trigger --> Unit[单元测试]
+  Trigger --> Build[构建镜像]
+  Lint --> Gate{质量门禁}
+  Unit --> Gate
+  Build --> Gate
+  Gate -->|通过| Deploy[部署 Staging]
+  Gate -->|失败| Notify[通知开发者]
+  Deploy --> Smoke[冒烟测试]
+  Deploy --> Perf[性能测试]
+  Deploy --> Security[安全扫描]
+  Smoke --> Approve{人工审批}
+  Perf --> Approve
+  Security --> Approve
+  Approve -->|批准| Prod[部署生产]
+  Approve -->|拒绝| Rollback[回滚]
+  Prod --> Monitor[监控告警]
+  Rollback --> Notify
+:::
+
+---
+
+## 9. ECharts 散点图
 
 :::chart
 {
@@ -191,7 +282,7 @@ flowchart LR
 
 ---
 
-## 9. ECharts 柱状图
+## 10. ECharts 柱状图
 
 :::chart
 {
@@ -205,7 +296,7 @@ flowchart LR
 
 ---
 
-## 10. ECharts 饼图
+## 11. ECharts 饼图
 
 :::chart
 {
@@ -226,7 +317,7 @@ flowchart LR
 
 ---
 
-## 11. 数学公式
+## 12. 数学公式
 
 行内公式：$E = mc^2$。
 
@@ -247,7 +338,7 @@ $$
 
 ---
 
-## 12. 提示框
+## 13. 提示框
 
 !!! Tip 提示
     使用 `!!! Tip` 创建提示框。正文缩进 4 空格，支持 **Markdown**。
@@ -263,7 +354,7 @@ $$
 
 ---
 
-## 13. 折叠块
+## 14. 折叠块
 
 <details>
 <summary>点击展开详情</summary>
@@ -286,7 +377,7 @@ $$
 
 ---
 
-## 14. HTML 内嵌控件
+## 15. HTML 内嵌控件
 
 在 Markdown 中直接写 HTML。Pico CSS 自动美化表单元素：
 
@@ -311,7 +402,7 @@ $$
 
 ---
 
-## 15. 多层级章节折叠测试
+## 16. 多层级章节折叠测试
 
 ### 13.1 二级子章节
 
@@ -346,7 +437,7 @@ $$
 
 ---
 
-## 16. 目录功能
+## 17. 目录功能
 
 侧边 TOC 应显示 h2、h3 层级，并随滚动高亮当前章节。
 移动端（≤800px）目录应改为顶部横置。
