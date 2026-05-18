@@ -412,17 +412,23 @@ function postProcessMermaidSvg(svg) {
     document.addEventListener('mouseup', onUp);
   });
 
-  // 拖动区扩展：容器空白区域按下鼠标 → 转发 mousedown 到 SVG
+  // 拖动区扩展：容器空白区域按下 → 直接调用 panBy 平移
   container.addEventListener('mousedown', (e) => {
-    if (e.target === container || e.target === toolbar || e.target.classList.contains('ed-mermaid-zoom') || e.target.classList.contains('ed-mermaid-reset')) {
-      const rect = svg.getBoundingClientRect();
-      // 将容器坐标钳制到 SVG 边界内，使 svgPanZoom 正常接管
-      const x = Math.min(Math.max(e.clientX, rect.left), rect.right);
-      const y = Math.min(Math.max(e.clientY, rect.top), rect.bottom);
-      const evt = new MouseEvent('mousedown', { clientX: x, clientY: y, button: 0, bubbles: true });
-      svg.dispatchEvent(evt);
-      e.preventDefault();
-    }
+    if (e.target.closest('.ed-mermaid-reset')) return;
+    e.preventDefault();
+    let lx = e.clientX, ly = e.clientY;
+    const onMove = (ev) => {
+      const z = instance.getZoom();
+      instance.panBy({ x: -(ev.clientX - lx) / z, y: -(ev.clientY - ly) / z });
+      lx = ev.clientX; ly = ev.clientY;
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      setTimeout(updateZoom, 50);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   });
 }
 

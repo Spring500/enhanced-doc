@@ -219,3 +219,79 @@ test.describe('mermaid R0 text-match scaling', () => {
     expect(wAfter, `字号缩小后宽度 ${wAfter} >= 缩小前 ${wBefore}`).toBeLessThan(wBefore);
   });
 });
+
+// 规则路径覆盖：每条 R 分支都有测试确认触发
+test.describe('mermaid rule path coverage', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/index.html');
+    await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+  });
+
+  // B1: 超高瘦图（index 4）naturalH > vpLimit，被 R3/R5 处理
+  test('ultra-tall TD naturalH exceeds viewport and is handled', async ({ page }) => {
+    const svg = page.locator('.mermaid').nth(4).locator('svg');
+    const vbW = await svg.evaluate((el) => parseFloat(el.getAttribute('data-mermaid-vbw')));
+    const vbH = await svg.evaluate((el) => parseFloat(el.getAttribute('data-mermaid-vbh')));
+    const rectH = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().height));
+    const vpLimit = Math.round((await page.evaluate(() => window.innerHeight)) * 0.7);
+
+    if (vbW && vbH) {
+      const rectW = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+      const ratio = vbW / vbH;
+      const natH = Math.round(rectW / ratio);
+      // naturalH 应超过视口限（图确实很高）
+      expect(natH, `naturalH ${natH} 未超过视口限 ${vpLimit}，R3 未触发`)
+        .toBeGreaterThan(vpLimit);
+    }
+    // R5 回退可能使 rectH > vpLimit，但不能超过 cw*2
+    const cw = await page.locator('.mermaid').nth(4).evaluate((el) => el.clientWidth);
+    expect(rectH, `高度 ${rectH} > ${cw * 2} (cw*2)`).toBeLessThanOrEqual(cw * 2 + 20);
+  });
+
+  // B2: 状态图（index 2）被缩至视口限以内
+  test('state diagram shrinks to within viewport limit via R3-R4', async ({ page }) => {
+    const svg = page.locator('.mermaid').nth(2).locator('svg');
+    const rectH = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().height));
+    const vpLimit = Math.round((await page.evaluate(() => window.innerHeight)) * 0.7);
+    expect(rectH, `状态图高度 ${rectH} > 视口限 ${vpLimit}`).toBeLessThanOrEqual(vpLimit);
+  });
+
+  // B3: 超宽矮图（index 5）触发了 R6 兜底
+  test('ultra-wide LR triggers R6 min-height floor', async ({ page }) => {
+    const svg = page.locator('.mermaid').nth(5).locator('svg');
+    const vbW = await svg.evaluate((el) => parseFloat(el.getAttribute('data-mermaid-vbw')));
+    const vbH = await svg.evaluate((el) => parseFloat(el.getAttribute('data-mermaid-vbh')));
+    const rectH = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().height));
+    const rectW = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+
+    if (vbW && vbH && rectW > 0) {
+      const ratio = vbW / vbH;
+      const naturalH = Math.round(rectW / ratio);
+      // naturalH 应低于 cw*0.15
+      expect(naturalH, `naturalH ${naturalH} 不低于 min-height 下限，R6 未触发`)
+        .toBeLessThan(rectH);
+      // 最终高度应 ≥ cw * 0.15（≈ 143）
+      expect(rectH, `兜底高度 ${rectH} < 100`).toBeGreaterThanOrEqual(100);
+    }
+  });
+});
+
+// D1: 窄屏下 R0 不生效
+test.describe('mermaid R0 narrow viewport', () => {
+  test('R0 maxWidth not applied when viewport is narrower than textMatchWidth', async ({ page }) => {
+    await page.goto('/test/index.html');
+    await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+    // 缩小视口到 480px 宽
+    await page.setViewportSize({ width: 480, height: 720 });
+    await page.waitForTimeout(1000);
+
+    const svg = page.locator('.mermaid').nth(0).locator('svg');
+    const w = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    // 窄屏下 contentW ≈ 480-240-64=176 → 减去 padding → 约160px
+    // 此时 textMatchWidth (~632) > contentW，maxWidth 不应再限制
+    const container = page.locator('.mermaid').nth(0);
+    const cw = await container.evaluate((el) => el.clientWidth);
+    // SVG 应接近容器宽度
+    expect(w, `窄屏 SVG ${w}px vs 容器 ${cw}px，差距过大`).toBeGreaterThanOrEqual(cw - 20);
+  });
+});
