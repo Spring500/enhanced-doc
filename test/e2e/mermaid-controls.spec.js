@@ -132,7 +132,8 @@ test.describe('mermaid drag forwarding', () => {
       test.skip(true, changed.err);
     }
     expect(changed.after).not.toBeNull();
-    expect(changed.after.x, `直接事件模拟后 pan 未改变`).toBeLessThan(before.x - 1);
+    // 向右拖 dx=80, pan.x 应增大
+    expect(changed.after.x, `直接事件模拟后 pan 未改变`).toBeGreaterThan(before.x + 1);
   });
 
   // A2: 工具栏区域也可拖动
@@ -159,7 +160,7 @@ test.describe('mermaid drag forwarding', () => {
     }, dx);
     if (changed.err) test.skip(true, changed.err);
     expect(changed.after).not.toBeNull();
-    expect(changed.after.x, `工具栏事件模拟后 pan 未改变`).toBeLessThan(before.x - 1);
+    expect(changed.after.x, `工具栏事件模拟后 pan 未改变`).toBeGreaterThan(before.x + 1);
   });
 
   // A3: 重置按钮上不触发拖动
@@ -209,7 +210,7 @@ test.describe('mermaid drag forwarding', () => {
     }, dx);
     if (result.err) test.skip(true, result.err);
     const panDx = result.after.pan.x - result.before.pan.x;
-    const expected = -dx / result.before.zoom;
+    const expected = dx / result.before.zoom;
     expect(Math.abs(panDx - expected), `pan偏移 ${panDx.toFixed(1)} ≠ ${expected.toFixed(1)}`).toBeLessThan(8);
   });
 });

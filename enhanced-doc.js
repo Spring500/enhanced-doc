@@ -375,6 +375,8 @@ function postProcessMermaidSvg(svg) {
   } catch(e) {}
   if (!instance) return;
   svg.__szInstance = instance;
+  // 禁用 svgPanZoom 自带拖动，统一由容器接管
+  try { instance.disablePan(); } catch(e) {}
 
   const container = svg.closest('.mermaid');
   if (!container) return;
@@ -412,14 +414,14 @@ function postProcessMermaidSvg(svg) {
     document.addEventListener('mouseup', onUp);
   });
 
-  // 拖动区扩展：容器空白区域按下 → 直接调用 panBy 平移
+  // 拖动区：容器统一接管所有拖动事件（含 SVG 上方区域）
   container.addEventListener('mousedown', (e) => {
     if (e.target.closest('.ed-mermaid-reset')) return;
     e.preventDefault();
     let lx = e.clientX, ly = e.clientY;
     const onMove = (ev) => {
       const z = instance.getZoom();
-      instance.panBy({ x: -(ev.clientX - lx) / z, y: -(ev.clientY - ly) / z });
+      instance.panBy({ x: (ev.clientX - lx) / z, y: (ev.clientY - ly) / z });
       lx = ev.clientX; ly = ev.clientY;
     };
     const onUp = () => {
