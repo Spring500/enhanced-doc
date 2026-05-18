@@ -251,7 +251,7 @@ function styles() {
 .admonition-body>:last-child{margin-bottom:0}
 .ed-mermaid,.ed-chart{background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}
 .mermaid{width:100%;overflow:auto;background:var(--pico-card-background-color,transparent);border:1px solid var(--pico-muted-border-color);border-radius:8px;padding:8px}
-.mermaid svg{cursor:grab;display:block;margin:0 auto}
+.mermaid svg{display:block;margin:0 auto}
 h2.ed-collapsible,h3.ed-collapsible,h4.ed-collapsible,h5.ed-collapsible,h6.ed-collapsible{cursor:pointer;user-select:none}
 h2.ed-collapsible::before,h3.ed-collapsible::before,h4.ed-collapsible::before,h5.ed-collapsible::before,h6.ed-collapsible::before{content:"▾ ";font-size:.75em}
 h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-collapsed::before,h6.ed-collapsed::before{content:"▸ "}
@@ -274,6 +274,8 @@ h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-co
 .ed-mermaid-zoom{min-width:32px;text-align:center}
 .ed-mermaid-reset{background:none;border:none;cursor:pointer;font-size:14px;padding:0 2px;line-height:1;color:var(--pico-muted-color);transition:color .15s}
 .ed-mermaid-reset:hover{color:var(--pico-primary)}
+.ed-mermaid-zoom-btn{background:none;border:none;cursor:pointer;font-size:13px;padding:0 3px;line-height:1;color:var(--pico-muted-color);transition:color .15s}
+.ed-mermaid-zoom-btn:hover{color:var(--pico-primary)}
 @media(max-width:800px){.layout{flex-direction:column}#toc{position:static;max-height:none;width:100%;border-right:none;border-bottom:1px solid var(--pico-muted-border-color)}#content{padding:1rem}}
 @media print{#toc{display:none!important}}`;
   return s;
@@ -375,8 +377,8 @@ function postProcessMermaidSvg(svg) {
   } catch(e) {}
   if (!instance) return;
   svg.__szInstance = instance;
-  // 禁用 svgPanZoom 自带拖动，统一由容器接管
-  try { instance.disablePan(); } catch(e) {}
+  // 禁用 svgPanZoom 自带交互，统一由容器接管
+  try { instance.disablePan(); instance.disableZoom(); } catch(e) {}
 
   const container = svg.closest('.mermaid');
   if (!container) return;
@@ -394,6 +396,22 @@ function postProcessMermaidSvg(svg) {
   }
   updateZoom();
 
+  const zoomInBtn = document.createElement('button');
+  zoomInBtn.className = 'ed-mermaid-zoom-btn';
+  zoomInBtn.textContent = '+';
+  zoomInBtn.title = '放大';
+  zoomInBtn.addEventListener('click', () => {
+    try { instance.zoomIn(); updateZoom(); } catch(e) {}
+  });
+
+  const zoomOutBtn = document.createElement('button');
+  zoomOutBtn.className = 'ed-mermaid-zoom-btn';
+  zoomOutBtn.textContent = '\u2212'; // −
+  zoomOutBtn.title = '缩小';
+  zoomOutBtn.addEventListener('click', () => {
+    try { instance.zoomOut(); updateZoom(); } catch(e) {}
+  });
+
   const resetBtn = document.createElement('button');
   resetBtn.className = 'ed-mermaid-reset';
   resetBtn.textContent = '\u21BA'; // ↺
@@ -402,21 +420,16 @@ function postProcessMermaidSvg(svg) {
     try { instance.fit(); instance.center(); updateZoom(); } catch(e) {}
   });
 
+  toolbar.appendChild(zoomOutBtn);
   toolbar.appendChild(zoomLabel);
+  toolbar.appendChild(zoomInBtn);
   toolbar.appendChild(resetBtn);
   container.style.position = 'relative';
   container.appendChild(toolbar);
 
-  // 监听缩放更新显示
-  svg.addEventListener('wheel', () => { setTimeout(updateZoom, 50); });
-  svg.addEventListener('mousedown', () => {
-    const onUp = () => { setTimeout(updateZoom, 50); document.removeEventListener('mouseup', onUp); };
-    document.addEventListener('mouseup', onUp);
-  });
-
   // 拖动区：容器统一接管所有拖动事件（含 SVG 上方区域）
   container.addEventListener('mousedown', (e) => {
-    if (e.target.closest('.ed-mermaid-reset')) return;
+    if (e.target.closest('.ed-mermaid-reset') || e.target.closest('.ed-mermaid-zoom-btn')) return;
     e.preventDefault();
     let lx = e.clientX, ly = e.clientY;
     const onMove = (ev) => {

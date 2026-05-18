@@ -28,12 +28,12 @@ test.describe('mermaid zoom display', () => {
     expect(display).toMatch(/^\d+%$/);
   });
 
-  test('zoom display updates after wheel zoom', async ({ page }) => {
-    const svg = page.locator('.mermaid svg').first();
+  test('zoom display updates after clicking + button', async ({ page }) => {
     const display = page.locator('.ed-mermaid-zoom').first();
+    const zoomIn = page.locator('.ed-mermaid-zoom-btn').nth(1); // + 按钮在 label 右边
     const before = await display.textContent();
-    await svg.dispatchEvent('wheel', { deltaY: -120, ctrlKey: true });
-    await page.waitForTimeout(200);
+    await zoomIn.click();
+    await page.waitForTimeout(100);
     const after = await display.textContent();
     expect(after, `缩放显示未变化: ${before} → ${after}`).not.toBe(before);
     const beforeNum = parseInt(before);
@@ -42,11 +42,13 @@ test.describe('mermaid zoom display', () => {
   });
 
   test('reset button restores zoom to initial fit', async ({ page }) => {
-    const svg = page.locator('.mermaid svg').first();
-    const reset = page.locator('.ed-mermaid-reset').first();
     const display = page.locator('.ed-mermaid-zoom').first();
-    await svg.dispatchEvent('wheel', { deltaY: -240, ctrlKey: true });
-    await page.waitForTimeout(200);
+    const zoomIn = page.locator('.ed-mermaid-zoom-btn').nth(1);
+    const reset = page.locator('.ed-mermaid-reset').first();
+    await zoomIn.click();
+    await page.waitForTimeout(100);
+    await zoomIn.click();
+    await page.waitForTimeout(100);
     const zoomed = parseInt(await display.textContent());
     await reset.click();
     await page.waitForTimeout(200);
@@ -212,5 +214,71 @@ test.describe('mermaid drag forwarding', () => {
     const panDx = result.after.pan.x - result.before.pan.x;
     const expected = dx / result.before.zoom;
     expect(Math.abs(panDx - expected), `pan偏移 ${panDx.toFixed(1)} ≠ ${expected.toFixed(1)}`).toBeLessThan(8);
+  });
+});
+
+test.describe('mermaid zoom buttons', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/test/index.html');
+    await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+  });
+
+  // Z6: 每个 toolbar 有 + 和 - 两个按钮
+  test('each toolbar has zoom-in and zoom-out buttons', async ({ page }) => {
+    const svgCount = await page.locator('.mermaid svg').count();
+    const zoomBtnCount = await page.locator('.ed-mermaid-zoom-btn').count();
+    expect(zoomBtnCount, `期望 ${svgCount * 2} 个缩放按钮，实际 ${zoomBtnCount}`).toBe(svgCount * 2);
+  });
+
+  // Z7: 连续点击 + 三次，缩放递增
+  test('clicking + three times increases zoom each step', async ({ page }) => {
+    const display = page.locator('.ed-mermaid-zoom').first();
+    const zoomIn = page.locator('.ed-mermaid-zoom-btn').nth(1);
+    const nums = [parseInt(await display.textContent())];
+    for (let i = 0; i < 3; i++) {
+      await zoomIn.click();
+      await page.waitForTimeout(50);
+      nums.push(parseInt(await display.textContent()));
+    }
+    for (let i = 1; i < nums.length; i++) {
+      expect(nums[i], `第 ${i} 次放大后 ${nums[i]} <= 上一步 ${nums[i - 1]}`).toBeGreaterThan(nums[i - 1]);
+    }
+  });
+
+  // Z8: 连续点击 - 三次，缩放递减
+  test('clicking - three times decreases zoom each step', async ({ page }) => {
+    const display = page.locator('.ed-mermaid-zoom').first();
+    const zoomIn = page.locator('.ed-mermaid-zoom-btn').nth(1);
+    const zoomOut = page.locator('.ed-mermaid-zoom-btn').first();
+    // 先放大一点确保有缩小空间
+    await zoomIn.click(); await page.waitForTimeout(50);
+    const nums = [parseInt(await display.textContent())];
+    for (let i = 0; i < 3; i++) {
+      await zoomOut.click();
+      await page.waitForTimeout(50);
+      nums.push(parseInt(await display.textContent()));
+    }
+    for (let i = 1; i < nums.length; i++) {
+      expect(nums[i], `第 ${i} 次缩小后 ${nums[i]} >= 上一步 ${nums[i - 1]}`).toBeLessThan(nums[i - 1]);
+    }
+  });
+
+  // Z9: 滚轮不再缩放
+  test('wheel event no longer changes zoom', async ({ page }) => {
+    const display = page.locator('.ed-mermaid-zoom').first();
+    const svg = page.locator('.mermaid svg').first();
+    const before = await display.textContent();
+    await svg.dispatchEvent('wheel', { deltaY: -500, ctrlKey: true });
+    await page.waitForTimeout(200);
+    const after = await display.textContent();
+    expect(after, `滚轮后缩放从 ${before} 变为 ${after}`).toBe(before);
+  });
+
+  // Z10: SVG 无双形光标
+  test('SVG does not have grab cursor', async ({ page }) => {
+    const cursor = await page.locator('.mermaid svg').first().evaluate((el) =>
+      getComputedStyle(el).cursor
+    );
+    expect(cursor, `SVG 光标应为默认，实际 ${cursor}`).not.toBe('grab');
   });
 });

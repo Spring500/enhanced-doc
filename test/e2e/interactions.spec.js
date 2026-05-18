@@ -56,13 +56,15 @@ test.describe('theme toggle', () => {
       return g ? g.getAttribute('transform') : null;
     });
     expect(transformBefore, 'svgPanZoom 未初始化，内部 <g> 没有 transform 属性').toBeTruthy();
-    await svg.dispatchEvent('wheel', { deltaY: -120, ctrlKey: true });
+    // 用 + 按钮代替滚轮测试缩放
+    const zoomIn = page.locator('.ed-mermaid-zoom-btn').nth(1);
+    await zoomIn.click();
     await page.waitForTimeout(300);
     const transformAfter = await svg.evaluate((el) => {
       const g = el.querySelector('g');
       return g ? g.getAttribute('transform') : null;
     });
-    expect(transformAfter, '滚轮事件未改变 <g> transform，svgPanZoom 可能未绑定 wheel 监听').not.toBe(transformBefore);
+    expect(transformAfter, '点击 + 按钮后 <g> transform 未变化，svgPanZoom 可能未重新初始化').not.toBe(transformBefore);
   });
 
   // 浅色主题下 Pico 的 --pico-card-background-color 与页面背景同为白色，
