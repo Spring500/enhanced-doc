@@ -251,7 +251,7 @@ function styles() {
 .admonition-body>:last-child{margin-bottom:0}
 .ed-mermaid,.ed-chart{background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}
 .mermaid{width:100%;overflow:auto;background:var(--pico-card-background-color,transparent);border:1px solid var(--pico-muted-border-color);border-radius:8px;padding:8px}
-.mermaid svg{cursor:grab;display:block}
+.mermaid svg{cursor:grab;display:block;margin:0 auto}
 h2.ed-collapsible,h3.ed-collapsible,h4.ed-collapsible,h5.ed-collapsible,h6.ed-collapsible{cursor:pointer;user-select:none}
 h2.ed-collapsible::before,h3.ed-collapsible::before,h4.ed-collapsible::before,h5.ed-collapsible::before,h6.ed-collapsible::before{content:"▾ ";font-size:.75em}
 h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-collapsed::before,h6.ed-collapsed::before{content:"▸ "}
