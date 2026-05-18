@@ -186,16 +186,14 @@ test.describe('mermaid R0 text-match scaling', () => {
   });
 
   // R0-Z1: 宽屏下目标缩放 < 1，证明文字大小匹配生效
-  test('target zoom is below 1 on wide viewport, proving text-size match', async ({ page }) => {
-    const zoom = await page.locator('.mermaid svg').first().evaluate((el) =>
-      parseFloat(el.getAttribute('data-mermaid-targetzoom'))
-    );
-    expect(zoom, `目标缩放 ${zoom} 应 < 1（宽屏下缩小内容）`).toBeLessThan(1);
-    expect(zoom).toBeGreaterThan(0.4);
+  test('SVG maxWidth is capped at text-match width on wide viewport', async ({ page }) => {
+    const svg = page.locator('.mermaid').nth(0).locator('svg');
+    const w = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    expect(w, `流程图宽度 ${w} > 650，R0 未生效`).toBeLessThanOrEqual(650);
+    expect(w, `流程图宽度 ${w} < 300`).toBeGreaterThan(300);
   });
 
-  // R0-Z2: 宽屏下 SVG 仍然撑满容器（交互区不受限）
-  test('SVG still fills container width on wide viewport', async ({ page }) => {
+  test('SVG width significantly below container width on wide viewport', async ({ page }) => {
     const data = await page.locator('.mermaid').evaluateAll((els) => {
       return els.map((el, i) => {
         const svg = el.querySelector('svg');
@@ -207,24 +205,17 @@ test.describe('mermaid R0 text-match scaling', () => {
     });
     for (const d of data.slice(0, 3)) {
       if (d.skip) continue;
-      // SVG 应接近容器宽（±10%，container padding 使 SVG 略窄）
-      expect(d.ratio, `图[${d.index}] SVG ${d.svgW}px / 容器 ${d.containerW}px = ${d.ratio} < 0.85`)
-        .toBeGreaterThan(0.85);
+      expect(d.ratio, `图[${d.index}] SVG ${d.svgW}px / 容器 ${d.containerW}px = ${d.ratio} > 0.7`)
+        .toBeLessThanOrEqual(0.7);
     }
   });
 
-  // R0-Z3: 字号缩放后目标缩放重新计算
-  test('font size change re-triggers R0 target zoom', async ({ page }) => {
-    const getZoom = async () => page.locator('.mermaid svg').first().evaluate(
-      (el) => parseFloat(el.getAttribute('data-mermaid-targetzoom'))
-    );
-    const zBefore = await getZoom();
-
-    await page.locator('#ed-fs-down').click(); // 75% → bodyFS = 12
+  test('font size change re-triggers R0 text-match cap', async ({ page }) => {
+    const svg = page.locator('.mermaid').nth(0).locator('svg');
+    const wBefore = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    await page.locator('#ed-fs-down').click();
     await page.waitForTimeout(500);
-    const zAfter = await getZoom();
-
-    // 字号缩小后 bodyFS 更小 → 目标缩放更小
-    expect(zAfter, `字号缩小后目标缩放 ${zAfter} ≥ 缩小前 ${zBefore}`).toBeLessThan(zBefore);
+    const wAfter = await svg.evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    expect(wAfter, `字号缩小后宽度 ${wAfter} >= 缩小前 ${wBefore}`).toBeLessThan(wBefore);
   });
 });

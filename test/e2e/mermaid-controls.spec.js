@@ -21,15 +21,14 @@ test.describe('mermaid zoom display', () => {
   });
 
   // Z3: 初始缩放应在目标缩放附近（宽屏下 < 1.0）
-  test('initial zoom is the R0 target zoom (below 1 on wide screen)', async ({ page }) => {
-    const svg = page.locator('.mermaid svg').first();
-    const zoom = await svg.evaluate((el) =>
-      el.__szInstance ? el.__szInstance.getZoom() : -1
-    );
-    const target = await svg.evaluate((el) =>
-      parseFloat(el.getAttribute('data-mermaid-targetzoom'))
-    );
-    expect(zoom, `实例缩放 ${zoom} ≠ 目标 ${target}`).toBeCloseTo(target, 1);
+  test('initial zoom is approximately 100% after fit', async ({ page }) => {
+    const zoom = await page.locator('.mermaid svg').first().evaluate((svg) => {
+      return svg.__szInstance ? svg.__szInstance.getZoom() : -1;
+    });
+    expect(zoom, `初始缩放 ${zoom} 偏离 1.0`).toBeGreaterThan(0.9);
+    expect(zoom).toBeLessThan(1.15);
+    const display = await page.locator('.ed-mermaid-zoom').first().textContent();
+    expect(display).toMatch(/^\d+%$/);
   });
 
   // Z4: 滚轮缩放后显示更新
@@ -49,25 +48,23 @@ test.describe('mermaid zoom display', () => {
     expect(afterNum, `放大后 ${afterNum} <= 放大前 ${beforeNum}`).toBeGreaterThan(beforeNum);
   });
 
-  // Z5: 点击重置回到 R0 目标缩放
-  test('reset button restores zoom to R0 target', async ({ page }) => {
+  // Z5: 点击重置回到初始缩放（≈100%）
+  test('reset button restores zoom to initial fit', async ({ page }) => {
     const svg = page.locator('.mermaid svg').first();
     const reset = page.locator('.ed-mermaid-reset').first();
+    const display = page.locator('.ed-mermaid-zoom').first();
 
-    const target = await svg.evaluate((el) =>
-      parseFloat(el.getAttribute('data-mermaid-targetzoom'))
-    );
-
-    // 先放大
     await svg.dispatchEvent('wheel', { deltaY: -240, ctrlKey: true });
     await page.waitForTimeout(200);
+    const zoomed = parseInt(await display.textContent());
 
     await reset.click();
     await page.waitForTimeout(200);
-    const zoom = await svg.evaluate((el) =>
-      el.__szInstance ? el.__szInstance.getZoom() : -1
-    );
-    expect(zoom, `重置后缩放 ${zoom} ≠ 目标 ${target}`).toBeCloseTo(target, 1);
+    const resetZoom = parseInt(await display.textContent());
+
+    expect(resetZoom, `重置后缩放 ${resetZoom}% 偏离 100%`).toBeGreaterThanOrEqual(90);
+    expect(resetZoom).toBeLessThanOrEqual(115);
+    expect(resetZoom, `重置后 ${resetZoom} >= 放大后 ${zoomed}`).toBeLessThan(zoomed);
   });
 });
 
@@ -77,12 +74,11 @@ test.describe('mermaid reset after environment change', () => {
     await page.waitForSelector('.mermaid svg', { timeout: 15000 });
   });
 
-  // Z6: 视口缩放后点击重置，应以新目标缩放为准
-  test('reset after viewport resize fits to new target zoom', async ({ page }) => {
+  // Z6: 视口缩放后点击重置，应以新视口为基准重新 fit
+  test('reset after viewport resize fits to new container size', async ({ page }) => {
     const svg = page.locator('.mermaid svg').first();
     const reset = page.locator('.ed-mermaid-reset').first();
 
-    // 改变视口
     await page.setViewportSize({ width: 1024, height: 768 });
     await page.waitForTimeout(1000);
 
@@ -91,14 +87,12 @@ test.describe('mermaid reset after environment change', () => {
     const zoom = await svg.evaluate((el) =>
       el.__szInstance ? el.__szInstance.getZoom() : -1
     );
-    const target = await svg.evaluate((el) =>
-      parseFloat(el.getAttribute('data-mermaid-targetzoom'))
-    );
-    expect(zoom, `视口变更后重置缩放 ${zoom} ≠ 目标 ${target}`).toBeCloseTo(target, 1);
+    expect(zoom, `视口变更后重置缩放 ${zoom}`).toBeGreaterThan(0.85);
+    expect(zoom).toBeLessThan(1.2);
   });
 
-  // Z7: 字号调整后点击重置，应以新目标缩放为准
-  test('reset after font size change fits to new target zoom', async ({ page }) => {
+  // Z7: 字号调整后点击重置，应以新容器宽度为基准重新 fit
+  test('reset after font size change fits to new container width', async ({ page }) => {
     await page.locator('#ed-fs-down').click();
     await page.waitForTimeout(500);
 
@@ -110,9 +104,7 @@ test.describe('mermaid reset after environment change', () => {
     const zoom = await svg.evaluate((el) =>
       el.__szInstance ? el.__szInstance.getZoom() : -1
     );
-    const target = await svg.evaluate((el) =>
-      parseFloat(el.getAttribute('data-mermaid-targetzoom'))
-    );
-    expect(zoom, `字号变更后重置缩放 ${zoom} ≠ 目标 ${target}`).toBeCloseTo(target, 1);
+    expect(zoom, `字号变更后重置缩放 ${zoom}`).toBeGreaterThan(0.85);
+    expect(zoom).toBeLessThan(1.2);
   });
 });
