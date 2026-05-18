@@ -65,6 +65,12 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
     options: { ignoreHtmlClass: 'ed-mermaid|ed-chart' }
   };
 
+  return loadJS(CDN + '/prismjs@1.29.0/prism.min.js');
+}).then(() => {
+  // Prism 语言组件按依赖顺序加载：c → cpp, python, bash 可并行
+  return loadJS(CDN + '/prismjs@1.29.0/components/prism-c.min.js');
+}).then(() => {
+
   return Promise.all([
     loadCSS(CDN + '/@picocss/pico@2/css/pico.min.css'),
     loadJS(CDN + '/mermaid@11/dist/mermaid.min.js'),
@@ -72,8 +78,9 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
     loadJS(CDN + '/tocbot@4/dist/tocbot.min.js'),
     loadJS(CDN + '/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js'),
     loadJS(CDN + '/mathjax@3/es5/tex-svg.js'),
-    loadJS(CDN + '/prismjs@1.29.0/prism.min.js'),
-    loadJS(CDN + '/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-cpp.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-python.min.js'),
+    loadJS(CDN + '/prismjs@1.29.0/components/prism-bash.min.js'),
     loadCSS(CDN + '/prismjs@1.29.0/themes/prism-tomorrow.min.css'),
     loadJS(CDN + '/elkjs@0.9.3/lib/elk.bundled.js'),
   ]);
@@ -130,20 +137,11 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
   document.body.innerHTML = buildLayout(rendered);
   enhanceCodeBlocks();
 
-  // 字号/主题控件 + 后处理（Prism 显式预加载语言再高亮）
+  // 字号/主题控件 + 后处理
   initControls();
   requestAnimationFrame(() => {
-    const langs = [...new Set(
-      [...document.querySelectorAll('pre code[class*="language-"]')]
-        .map((c) => c.className.match(/language-(\w+)/)?.[1])
-        .filter(Boolean)
-    )];
-    function highlightAndPost() { Prism.highlightAll(); postProcess(); }
-    if (langs.length && typeof Prism !== 'undefined' && Prism.plugins && Prism.plugins.autoloader) {
-      Prism.plugins.autoloader.loadLanguages(langs, highlightAndPost);
-    } else {
-      highlightAndPost();
-    }
+    Prism.highlightAll();
+    postProcess();
   });
 }).catch((e) => {
   document.body.innerHTML = '<pre style="color:red;padding:2rem;white-space:pre-wrap">enhanced-doc 加载失败:\n' + e.message + '</pre>';
@@ -402,6 +400,75 @@ function postProcessMermaidSvg(svg) {
   svg.style.width = '100%';
   svg.style.maxWidth = '100%';
   applyMermaidSizing(svg);
+
+  // CSS 变量主题注入：从 --ed-bg / --ed-fg 通过 color-mix() 推导所有颜色
+  svg.classList.add('ed-themed');
+  const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+  styleEl.textContent = [
+    '.ed-themed {',
+    '  --_text: var(--ed-fg);',
+    '  --_text-alt: color-mix(in srgb, var(--ed-fg) 60%, var(--ed-bg));',
+    '  --_line: color-mix(in srgb, var(--ed-fg) 50%, var(--ed-bg));',
+    '  --_arrow: color-mix(in srgb, var(--ed-fg) 85%, var(--ed-bg));',
+    '  --_node-fill: color-mix(in srgb, var(--ed-fg) 4%, var(--ed-bg));',
+    '  --_node-stroke: color-mix(in srgb, var(--ed-fg) 18%, var(--ed-bg));',
+    '  --_cluster-fill: color-mix(in srgb, var(--ed-fg) 3%, var(--ed-bg));',
+    '  --_cluster-stroke: color-mix(in srgb, var(--ed-fg) 12%, var(--ed-bg));',
+    '  --_inner-stroke: color-mix(in srgb, var(--ed-fg) 10%, var(--ed-bg));',
+    '  --_label-bg: var(--ed-bg); }',
+    '.ed-themed .node rect,.ed-themed .node circle,.ed-themed .node polygon,.ed-themed .node path,.ed-themed .node ellipse',
+    '  { fill: var(--_node-fill) !important; stroke: var(--_node-stroke) !important; }',
+    '.ed-themed .node text,.ed-themed .node tspan',
+    '  { fill: var(--_text) !important; }',
+    '.ed-themed .edgePath .path',
+    '  { stroke: var(--_line) !important; }',
+    '.ed-themed .edgeLabel rect',
+    '  { fill: var(--_label-bg) !important; stroke: var(--_line) !important; }',
+    '.ed-themed .edgeLabel text,.ed-themed .edgeLabel span,.ed-themed .edgeLabel tspan',
+    '  { fill: var(--_text-alt) !important; }',
+    '.ed-themed .cluster rect',
+    '  { fill: var(--_cluster-fill) !important; stroke: var(--_cluster-stroke) !important; }',
+    '.ed-themed .cluster text,.ed-themed .cluster tspan',
+    '  { fill: var(--_text-alt) !important; }',
+    '.ed-themed marker path',
+    '  { fill: var(--_arrow) !important; }',
+    '.ed-themed .labelBkg',
+    '  { fill: var(--_label-bg) !important; }',
+    '.ed-themed .label,.ed-themed .label text',
+    '  { fill: var(--_text) !important; }',
+    '.ed-themed .actor,.ed-themed .actor rect',
+    '  { fill: var(--_node-fill) !important; stroke: var(--_node-stroke) !important; }',
+    '.ed-themed .actor text,.ed-themed .actor tspan',
+    '  { fill: var(--_text) !important; }',
+    '.ed-themed .actor-line',
+    '  { stroke: var(--_line) !important; }',
+    '.ed-themed .messageLine0,.ed-themed .messageLine1',
+    '  { stroke: var(--_line) !important; }',
+    '.ed-themed .note rect',
+    '  { fill: var(--_cluster-fill) !important; stroke: var(--_cluster-stroke) !important; }',
+    '.ed-themed .note text',
+    '  { fill: var(--_text-alt) !important; }',
+    '.ed-themed .grid .tick text',
+    '  { fill: var(--_text-alt) !important; }',
+    '.ed-themed .taskText,.ed-themed .taskTextOutsideRight,.ed-themed .taskTextOutsideLeft',
+    '  { fill: var(--_text) !important; }',
+    '.ed-themed .task rect',
+    '  { fill: var(--_node-fill) !important; stroke: var(--_node-stroke) !important; }',
+    '.ed-themed .grid .tick line,.ed-themed .grid path',
+    '  { stroke: var(--_inner-stroke) !important; }',
+    '.ed-themed .section0,.ed-themed .section1,.ed-themed .section2,.ed-themed .section3,.ed-themed .section4,.ed-themed .section5,.ed-themed .section6,.ed-themed .section7',
+    '  { fill: var(--_text-alt) !important; }',
+    '.ed-themed .sectionTitle',
+    '  { fill: var(--_text) !important; }',
+    '.ed-themed .titleText',
+    '  { fill: var(--_text) !important; }',
+  ].join('\n');
+  svg.insertBefore(styleEl, svg.firstChild);
+  // 初始主题：从 document dataset 读取
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  svg.style.setProperty('--ed-bg', isDark ? '#1a1b26' : '#ffffff');
+  svg.style.setProperty('--ed-fg', isDark ? '#c0caf5' : '#343b58');
+
   let instance;
   try {
     instance = svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
@@ -663,28 +730,18 @@ function initControls() {
   applyFontSize(); // 初始时显式对齐 root 字号与标签
 
   let ED_THEME = 'dark';
-  let mermaidRerenderIdx = 0;
-  const MERMAID_THEMES = {
-    dark:  { theme: 'dark',    layout: 'elk', themeVariables: { fontSize: '14px' } },
-    light: { theme: 'default', layout: 'elk', themeVariables: { fontSize: '14px' } }
+  const ED_THEME_COLORS = {
+    dark:  { bg: '#1a1b26', fg: '#c0caf5' },
+    light: { bg: '#ffffff', fg: '#343b58' }
   };
   document.getElementById('ed-theme-btn').addEventListener('click', () => {
     ED_THEME = ED_THEME === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = ED_THEME;
     document.getElementById('ed-theme-btn').textContent = ED_THEME === 'dark' ? '☾' : '☀';
-    mermaid.initialize({ startOnLoad: false, ...MERMAID_THEMES[ED_THEME] });
-    document.querySelectorAll('.mermaid').forEach((el) => {
-      const graph = el.getAttribute('data-mermaid-src');
-      if (!graph) return;
-      const oldSvg = el.querySelector('svg');
-      if (oldSvg) {
-        try { svgPanZoom(oldSvg).destroy(); } catch(e) {}
-      }
-      mermaid.render('mermaid-rerender-' + (++mermaidRerenderIdx), graph).then((r) => {
-        el.innerHTML = r.svg;
-        const svg = el.querySelector('svg');
-        if (svg) postProcessMermaidSvg(svg);
-      }).catch((e) => { console.warn('enhanced-doc: Mermaid 主题切换失败:', e); });
+    const colors = ED_THEME_COLORS[ED_THEME];
+    document.querySelectorAll('.mermaid svg.ed-themed').forEach((svg) => {
+      svg.style.setProperty('--ed-bg', colors.bg);
+      svg.style.setProperty('--ed-fg', colors.fg);
     });
     const chartBg = ED_THEME === 'dark' ? 'transparent' : '#f8f9fa';
     document.querySelectorAll('.ed-chart').forEach((el) => {
