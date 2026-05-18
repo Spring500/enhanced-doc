@@ -411,6 +411,19 @@ function postProcessMermaidSvg(svg) {
     const onUp = () => { setTimeout(updateZoom, 50); document.removeEventListener('mouseup', onUp); };
     document.addEventListener('mouseup', onUp);
   });
+
+  // 拖动区扩展：容器空白区域按下鼠标 → 转发 mousedown 到 SVG
+  container.addEventListener('mousedown', (e) => {
+    if (e.target === container || e.target === toolbar || e.target.classList.contains('ed-mermaid-zoom') || e.target.classList.contains('ed-mermaid-reset')) {
+      const rect = svg.getBoundingClientRect();
+      // 将容器坐标钳制到 SVG 边界内，使 svgPanZoom 正常接管
+      const x = Math.min(Math.max(e.clientX, rect.left), rect.right);
+      const y = Math.min(Math.max(e.clientY, rect.top), rect.bottom);
+      const evt = new MouseEvent('mousedown', { clientX: x, clientY: y, button: 0, bubbles: true });
+      svg.dispatchEvent(evt);
+      e.preventDefault();
+    }
+  });
 }
 
 // ── Mermaid 渲染 ──
