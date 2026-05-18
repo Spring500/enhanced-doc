@@ -251,7 +251,7 @@ function styles() {
 .admonition-body>:last-child{margin-bottom:0}
 .ed-mermaid,.ed-chart{background:var(--pico-card-background-color,transparent);border-radius:8px;padding:8px}
 .mermaid{width:100%;overflow:auto;background:var(--pico-card-background-color,transparent);border:1px solid var(--pico-muted-border-color);border-radius:8px;padding:8px}
-.mermaid svg{cursor:grab;display:block;margin:0 auto}
+.mermaid svg{cursor:grab;display:block}
 h2.ed-collapsible,h3.ed-collapsible,h4.ed-collapsible,h5.ed-collapsible,h6.ed-collapsible{cursor:pointer;user-select:none}
 h2.ed-collapsible::before,h3.ed-collapsible::before,h4.ed-collapsible::before,h5.ed-collapsible::before,h6.ed-collapsible::before{content:"▾ ";font-size:.75em}
 h2.ed-collapsed::before,h3.ed-collapsed::before,h4.ed-collapsed::before,h5.ed-collapsed::before,h6.ed-collapsed::before{content:"▸ "}
@@ -323,14 +323,13 @@ function applyMermaidSizing(svg) {
     const ratio = w / h;
     const cw = container.clientWidth || MERMAID_FALLBACK_WIDTH;
     const vpH = window.innerHeight;
-    // R0: 正文等宽 — Mermaid 文字与正文字号匹配
+    // R0: 目标缩放 — 宽屏下缩小内容使文字匹配正文；窄屏 cw < 等宽时不缩放
     const bodyFS = parseFloat(getComputedStyle(document.body).fontSize);
     const textMatchWidth = Math.round(w * bodyFS / MERMAID_FONT_SIZE);
-    svg.style.maxWidth = textMatchWidth + 'px';
-    // R1: 以有效宽度算自然高度
-    const contentW = cw - 16; // border-box 下 content area = cw − padding
-    const effectiveW = Math.min(contentW, textMatchWidth);
-    const naturalH = effectiveW / ratio;
+    const contentW = cw - 16;
+    svg.setAttribute('data-mermaid-targetzoom', Math.min(1, textMatchWidth / contentW).toFixed(4));
+    // R1: 以容器内容宽算自然高度
+    const naturalH = contentW / ratio;
     let targetH;
     if (naturalH <= vpH * VIEWPORT_FACTOR) {
       targetH = naturalH;
@@ -371,10 +370,15 @@ function postProcessMermaidSvg(svg) {
   let instance;
   try {
     instance = svgPanZoom(svg, { zoomEnabled: true, controlIconsEnabled: false,
-      fit: true, center: true, minZoom: 0.25, maxZoom: 5 });
+      fit: false, center: true, minZoom: 0.25, maxZoom: 5 });
   } catch(e) {}
   if (!instance) return;
   svg.__szInstance = instance;
+  // 应用 R0 目标缩放
+  const targetZoom = parseFloat(svg.getAttribute('data-mermaid-targetzoom'));
+  if (targetZoom && targetZoom < 1) {
+    try { instance.zoom(targetZoom); instance.center(); } catch(e) {}
+  }
 
   const container = svg.closest('.mermaid');
   if (!container) return;
@@ -397,7 +401,12 @@ function postProcessMermaidSvg(svg) {
   resetBtn.textContent = '\u21BA'; // ↺
   resetBtn.title = '重置缩放与位置';
   resetBtn.addEventListener('click', () => {
-    try { instance.fit(); instance.center(); updateZoom(); } catch(e) {}
+    try {
+      const tz = parseFloat(svg.getAttribute('data-mermaid-targetzoom'));
+      if (tz && tz < 1) { instance.zoom(tz); }
+      instance.center();
+      updateZoom();
+    } catch(e) {}
   });
 
   toolbar.appendChild(zoomLabel);
