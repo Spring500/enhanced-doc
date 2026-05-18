@@ -1,6 +1,8 @@
 // 单元测试环境准备
 // 模拟 CDN 全局变量和 DOM，使 enhanced-doc.js IIFE 能安全执行
 
+window.__ED_TEST = true;
+
 window.marked = {
   use: () => {},
   parse: (s) => s,

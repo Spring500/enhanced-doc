@@ -45,6 +45,7 @@ function loadCSS(href) {
 // ═══ 设置暗色主题 ═══
 document.documentElement.dataset.theme = 'dark';
 
+
 // ═══ 1. 串行加载 marked → marked-gfm-heading-id ═══
 loadJS(CDN + '/marked/marked.min.js').then(() => {
 
@@ -74,12 +75,43 @@ loadJS(CDN + '/marked/marked.min.js').then(() => {
     loadJS(CDN + '/prismjs@1.29.0/prism.min.js'),
     loadJS(CDN + '/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js'),
     loadCSS(CDN + '/prismjs@1.29.0/themes/prism-tomorrow.min.css'),
+    loadJS(CDN + '/elkjs@0.9.3/lib/elk.bundled.js'),
   ]);
 }).then(() => {
 
+  // ═══ 2.5 加载 ELK 布局引擎 ═══
+  // elkjs UMD 已在 Promise.all 中通过 loadJS 加载至 window.ELK
+  // 获取 renderer chunk，将挂死的 elkjs +esm 导入替换为 window.ELK, 通过 blob URL 导入
+  if (!window.__ED_TEST && window.ELK) {
+    return fetch(CDN + '/@mermaid-js/layout-elk@0.2.1/dist/chunks/mermaid-layout-elk.core/render-TAZW7USW.mjs/+esm')
+      .then(r => r.text())
+      .then(code => {
+        code = code.replace(
+          'import t from"/npm/elkjs@0.9.3/lib/elk.bundled.js/+esm"',
+          'var t=window.ELK;'
+        ).replace(
+          'from"/npm/d3@7.9.0/+esm"',
+          'from"' + CDN + '/d3@7/+esm"'
+        );
+        const blobUrl = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+        return import(blobUrl);
+      }).then(m => ({ default: [{ name: 'elk', loader: () => Promise.resolve(m) }] }))
+      .catch(() => null);
+  }
+  return null;
+}).then((elkModule) => {
+
   // ═══ 3. 所有库就绪：配置 + 渲染 ═══
+  if (elkModule?.default && typeof mermaid.registerLayoutLoaders === 'function') {
+    try {
+      mermaid.registerLayoutLoaders(elkModule.default);
+    } catch(e) {
+      console.warn('enhanced-doc: ELK 注册失败，使用 dagre:', e.message);
+    }
+  }
+
   mermaid.initialize({
-    startOnLoad: false, theme: 'dark',
+    startOnLoad: false, theme: 'dark', layout: 'elk',
     themeVariables: {
       primaryColor: '#2a3555', primaryBorderColor: '#5b8def',
       primaryTextColor: '#e1e4ed', lineColor: '#5b8def', fontSize: '14px'
@@ -377,13 +409,11 @@ function postProcessMermaidSvg(svg) {
   } catch(e) {}
   if (!instance) return;
   svg.__szInstance = instance;
-  // 禁用 svgPanZoom 自带交互，统一由容器接管
   try { instance.disablePan(); instance.disableZoom(); } catch(e) {}
 
   const container = svg.closest('.mermaid');
   if (!container) return;
 
-  // 已有工具栏则跳过（主题切换时 postProcessMermaidSvg 可能多次调用）
   if (container.querySelector('.ed-mermaid-toolbar')) return;
 
   const toolbar = document.createElement('div');
@@ -406,7 +436,7 @@ function postProcessMermaidSvg(svg) {
 
   const zoomOutBtn = document.createElement('button');
   zoomOutBtn.className = 'ed-mermaid-zoom-btn';
-  zoomOutBtn.textContent = '\u2212'; // −
+  zoomOutBtn.textContent = '\u2212';
   zoomOutBtn.title = '缩小';
   zoomOutBtn.addEventListener('click', () => {
     try { instance.zoomOut(); updateZoom(); } catch(e) {}
@@ -414,7 +444,7 @@ function postProcessMermaidSvg(svg) {
 
   const resetBtn = document.createElement('button');
   resetBtn.className = 'ed-mermaid-reset';
-  resetBtn.textContent = '\u21BA'; // ↺
+  resetBtn.textContent = '\u21BA';
   resetBtn.title = '重置缩放与位置';
   resetBtn.addEventListener('click', () => {
     try { instance.fit(); instance.center(); updateZoom(); } catch(e) {}
@@ -427,7 +457,6 @@ function postProcessMermaidSvg(svg) {
   container.style.position = 'relative';
   container.appendChild(toolbar);
 
-  // 拖动区：容器统一接管所有拖动事件（含 SVG 上方区域）
   container.addEventListener('mousedown', (e) => {
     if (e.target.closest('.ed-mermaid-reset') || e.target.closest('.ed-mermaid-zoom-btn')) return;
     e.preventDefault();
@@ -636,8 +665,8 @@ function initControls() {
   let ED_THEME = 'dark';
   let mermaidRerenderIdx = 0;
   const MERMAID_THEMES = {
-    dark:  { theme: 'dark',    themeVariables: { fontSize: '14px' } },
-    light: { theme: 'default', themeVariables: { fontSize: '14px' } }
+    dark:  { theme: 'dark',    layout: 'elk', themeVariables: { fontSize: '14px' } },
+    light: { theme: 'default', layout: 'elk', themeVariables: { fontSize: '14px' } }
   };
   document.getElementById('ed-theme-btn').addEventListener('click', () => {
     ED_THEME = ED_THEME === 'dark' ? 'light' : 'dark';

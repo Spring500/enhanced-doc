@@ -4,6 +4,7 @@ test.describe('mermaid zoom display', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/index.html');
     await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+    await page.waitForSelector('.ed-mermaid-toolbar', { timeout: 5000 });
   });
 
   test('every mermaid has a zoom percentage display', async ({ page }) => {
@@ -63,6 +64,7 @@ test.describe('mermaid reset after environment change', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/index.html');
     await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+    await page.waitForSelector('.ed-mermaid-toolbar', { timeout: 5000 });
   });
 
   test('reset after viewport resize fits to new container size', async ({ page }) => {
@@ -98,6 +100,7 @@ test.describe('mermaid drag forwarding', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/index.html');
     await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+    await page.waitForSelector('.ed-mermaid-toolbar', { timeout: 5000 });
   });
 
   // A1: 容器空白区域可拖动——模拟 mousedown→mousemove→mouseup 事件流
@@ -221,6 +224,7 @@ test.describe('mermaid zoom buttons', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/test/index.html');
     await page.waitForSelector('.mermaid svg', { timeout: 15000 });
+    await page.waitForSelector('.ed-mermaid-toolbar', { timeout: 5000 });
   });
 
   // Z6: 每个 toolbar 有 + 和 - 两个按钮
